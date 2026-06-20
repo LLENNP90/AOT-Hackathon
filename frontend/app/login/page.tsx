@@ -1,13 +1,11 @@
+
 import Link from 'next/link';
 
-export default function Page() {
+export default function login() {
   return (
-    <div>
-      <p>page</p>
-      
-      {}
-      <Link 
-        href="/login" 
+    <div>login
+        <Link 
+        href="/" 
         style={{ 
           padding: '8px 16px', 
           backgroundColor: '#000', 
@@ -19,5 +17,5 @@ export default function Page() {
         Login
       </Link>
     </div>
-  );
+  )
 }
