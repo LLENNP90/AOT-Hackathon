@@ -29,6 +29,6 @@ app.use("/api/user", userRouter)
 
 app.use("/api/employee", employeeRouter);
 app.use("/api/shift", shiftRouter);
-app.use("api/activityLog", activityLogRouter);
+app.use("/api/activityLog", activityLogRouter);
 app.use("/api/optimisation", optimisationRouter)
 app.use(errorHandler)

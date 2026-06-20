@@ -11,7 +11,7 @@ router.get(
     async (req, res, next) => {
         try {
             const allShifts = await ShiftHandler.getAllShift() 
-            return Success(res, allShifts)
+            return Success(res, {shifts: allShifts})
         } catch (err) {
             next(err)
         }
@@ -45,7 +45,7 @@ router.put(
             const shiftId = req.params.id as string
             const {newStartTime, newEndTime, employeeId} = req.body
             // const employeeId = (req as any).employeeId
-            if (!newStartTime || !newEndTime || employeeId){
+            if (!newStartTime || !newEndTime || !employeeId){
                 return ErrorResponses.MISSING_FIELDS
             }
             const updatedShift = await ShiftHandler.updateShift({
@@ -69,18 +69,18 @@ router.post(
 
         const {employeeId, startTime, endTime} = req.body
 
-        const shift = ShiftHandler.newShift({
-            employeeId: employeeId,
-            startTime: startTime,
-            endTime: endTime
-        })
+        const shift = await ShiftHandler.newShift({
+            employeeId,
+            startTime: new Date(startTime),
+            endTime: new Date(endTime),
+        });
         Success(res, { shift })
     }
 )
 
 
 router.delete(
-    "/id",
+    "/:id",
     authMiddleware,
     async (req, res, next) => {
         try{
