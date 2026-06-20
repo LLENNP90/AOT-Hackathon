@@ -27,10 +27,12 @@ export const ErrorResponses = {
     USERNAME_TAKEN: new AppError(409, 'USERNAME_TAKEN'),
     EMAIL_TAKEN: new AppError(409, 'EMAIL_TAKEN'),
     SAVED_ALREADY_EXISTS: new AppError(409, "SAVED_ALREADY_EXISTS"),
+    EMPLOYEE_ALREADY_EXITS: new AppError(409, "EMPLOYEE_ALREADY_EXIST"),
 
     // not found (404)
     USER_NOT_FOUND: new AppError(404, 'USER_NOT_FOUND'),
     SAVED_NOT_FOUND: new AppError(404, "SAVED_NOT_FOUND"),
+    EMPLOYEE_NOT_FOUND: new AppError(404, "EMPLOYEE_NOT_FOUND"),
 
     // server (500)
     INTERNAL_ERROR: new AppError(500, 'INTERNAL_ERROR'),
