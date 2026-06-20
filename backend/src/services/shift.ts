@@ -28,7 +28,8 @@ export class ShiftHandler {
                 id: true,
                 employeeId: true,
                 startTime: true,
-                endTime: true
+                endTime: true,
+                isOptimised: true
             }
         })
     }

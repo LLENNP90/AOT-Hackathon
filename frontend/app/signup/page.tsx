@@ -1,8 +1,11 @@
 'use client';
 
 import { ChangeEvent, useState } from 'react'
+import { useRouter } from "next/navigation";
+import { api } from "@/lib/api";
 export default function page() {
-
+    const router = useRouter();
+    
     interface SignupFormData {
         username: string;
         password:  string;
@@ -15,44 +18,28 @@ export default function page() {
         businessName: '',
     });
     const [error, setError] = useState<string>('');
-    const [success, setSuccess] = useState<boolean>(false);
+    // const [success, setSuccess] = useState<boolean>(false);
     const [loading, setLoading] = useState<boolean>(false);
 
-    const handleSubmit = async (e: any) => {
-    e.preventDefault();
-    setLoading(true);
-    setError('');
+    const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+      e.preventDefault();
+      setLoading(true);
+      setError("");
 
-    try {
-      // Replace with your actual backend API endpoint
-      const response = await fetch('/api/auth/signup', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
+      try {
+        await api.signup({
           username: formData.username,
-          password: formData.password, // Your backend will map this to passwordHash
-          BusinessName: formData.businessName, // Maps to BusinessName in Prisma
-        }),
-      });
+          password: formData.password,
+          businessName: formData.businessName,
+        });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || 'Something went wrong');
+        router.push("/home");
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "SIGNUP_FAILED");
+      } finally {
+        setLoading(false);
       }
-
-      // Handle successful signup (e.g., redirect to login or dashboard)
-      console.log('Signup successful:', data);
-      alert('Account created successfully!');
-      
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
+    };
   const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData((prevState) => ({
@@ -78,11 +65,6 @@ export default function page() {
           </div>
         )}
 
-        {success && (
-          <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 px-4 py-3 rounded-lg text-sm" role="alert">
-            <span className="font-semibold">Success!</span> Account simulated successfully. Check your browser console.
-          </div>
-        )}
 
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           <div className="space-y-4 rounded-md">
