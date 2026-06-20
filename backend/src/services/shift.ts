@@ -59,9 +59,27 @@ export class ShiftHandler {
         })
         if (!shift) throw ErrorResponses.MISSING_FIELDS //CHANGE LATER
 
-        await prisma.shift.update({
+        return await prisma.shift.update({
             where: {id: shift.id},
             data: {startTime: input.newStartTime, endTime: input.newEndTime}
         })
+    }
+
+    static async deleteShift(shiftId: string) {
+        try{
+            const shift = await prisma.shift.findUnique({
+                where: {id: shiftId}
+            })
+
+            if (!shift) {
+                return ErrorResponses.EMPLOYEE_NOT_FOUND
+            }
+
+            return await prisma.shift.delete({
+                where: {id: shiftId}
+            });
+        } catch (err) {
+            throw err
+        }
     }
 }

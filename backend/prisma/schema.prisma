@@ -55,5 +55,5 @@ model ActivityLog {
   actionType    ActionType
   metadata      Json?
 
-  createdAt     DateTime
+  createdAt     DateTime    @default(now())
 }
