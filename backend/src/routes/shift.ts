@@ -10,7 +10,8 @@ router.get(
     authMiddleware,
     async (req, res, next) => {
         try {
-            const allShifts = await ShiftHandler.getAllShift() 
+            if (!req.user) throw ErrorResponses.UNAUTHORISED
+            const allShifts = await ShiftHandler.getAllShift(req.user.id) 
             return Success(res, {shifts: allShifts})
         } catch (err) {
             next(err)

@@ -8,22 +8,26 @@ interface newShiftInput {
 }
 
 export class ShiftHandler {
-    static async newShift(input: newShiftInput) {
-        try {
-            return await prisma.shift.create({data: {
-                    employeeId: input.employeeId,
-                    startTime: input.startTime,
-                    endTime: input.endTime,
-                    isOptimised: false
-                }
-            })
-        } catch(err) {
-            throw err
-        }
-        
+    static async newShift( input: newShiftInput) {
+
+
+        return await prisma.shift.create({
+            data: {
+                employeeId: input.employeeId,
+                startTime: input.startTime,
+                endTime: input.endTime,
+                isOptimised: false
+            }
+        })
+
     } 
-    static async getAllShift(){
+    static async getAllShift(userId: string){
         return await prisma.shift.findMany({
+            where: {
+                employee: {
+                    userId
+                }
+            },
             select: {
                 id: true,
                 employeeId: true,

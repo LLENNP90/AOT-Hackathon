@@ -1,36 +1,181 @@
 'use client';
 
-import Link from 'next/link';
-import React, { useState } from 'react';
+import Link from "next/link";
+import React, { useEffect, useState } from "react";
+import { api, Employee, ApiShift } from "@/lib/api";
 
 
 interface Member {
   id: string;
   name: string;
   role: string;
-  avatarUrl?: string;
   initials: string;
   hourlywages: number;
-  status: 'Active' | 'Inactive';
+  status: "Active" | "Inactive";
   colorClass: string;
 }
 
-const MembersSection: React.FC = () => {
-  const [members, setMembers] = useState<Member[]>([
-    { id: '1', name: 'Jen Sen', role: 'Admin', initials: 'JS', hourlywages: 12, status: 'Active', colorClass: 'bg-rose-500' },
-    { id: '2', name: 'Wei Ming', role: 'Full Access', initials: 'WM', hourlywages: 10, status: 'Active', colorClass: 'bg-teal-500' },
-    { id: '3', name: 'Jun Han', role: 'Full Access', initials: 'JH', hourlywages: 10, status: 'Active', colorClass: 'bg-indigo-500' },
-    { id: '4', name: 'Kit Qi', role: 'Full Access', initials: 'KQ', hourlywages: 12, status: 'Active', colorClass: 'bg-amber-500' },
-    { id: '5', name: 'Wayne Ong', role: 'Full Access', initials: 'WO', hourlywages: 15, status: 'Active', colorClass: 'bg-orange-500' },
-  ]);
+interface MemberForm {
+  name: string;
+  role: string;
+  hourlyWage: string;
+}
 
-  const handleDeleteMember = (id: string) => {
-  if (confirm("Are you sure you want to remove this member?")) {
-    setMembers(prevMembers => prevMembers.filter(member => member.id !== id));
-  }
+const colorClasses = [
+  "bg-rose-500",
+  "bg-teal-500",
+  "bg-indigo-500",
+  "bg-amber-500",
+  "bg-orange-500",
+  "bg-blue-500",
+];
+
+const getInitials = (name: string) => {
+  return name
+    .split(" ")
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
 };
 
-  const [editingMember, setEditingMember] = useState<any | null>(null);
+const isToday = (date: Date) => {
+  const today = new Date();
+
+  return (
+    date.getFullYear() === today.getFullYear() &&
+    date.getMonth() === today.getMonth() &&
+    date.getDate() === today.getDate()
+  );
+};
+
+const employeeToMember = (
+  employee: Employee,
+  index: number,
+  shifts: ApiShift[]
+): Member => {
+  const hasShiftToday = shifts.some((shift) => {
+    return shift.employeeId === employee.id && isToday(new Date(shift.startTime));
+  });
+
+  return {
+    id: employee.id,
+    name: employee.name,
+    role: employee.role,
+    initials: getInitials(employee.name),
+    hourlywages: employee.hourlyWage,
+    status: hasShiftToday ? "Active" : "Inactive",
+    colorClass: colorClasses[index % colorClasses.length],
+  };
+};
+
+const MembersSection: React.FC = () => {
+  // const [members, setMembers] = useState<Member[]>([
+  //   { id: '1', name: 'Jen Sen', role: 'Admin', initials: 'JS', hourlywages: 12, status: 'Active', colorClass: 'bg-rose-500' },
+  //   { id: '2', name: 'Wei Ming', role: 'Full Access', initials: 'WM', hourlywages: 10, status: 'Active', colorClass: 'bg-teal-500' },
+  //   { id: '3', name: 'Jun Han', role: 'Full Access', initials: 'JH', hourlywages: 10, status: 'Active', colorClass: 'bg-indigo-500' },
+  //   { id: '4', name: 'Kit Qi', role: 'Full Access', initials: 'KQ', hourlywages: 12, status: 'Active', colorClass: 'bg-amber-500' },
+  //   { id: '5', name: 'Wayne Ong', role: 'Full Access', initials: 'WO', hourlywages: 15, status: 'Active', colorClass: 'bg-orange-500' },
+  // ]);
+  const [members, setMembers] = useState<Member[]>([]);
+  const [shifts, setShifts] = useState<ApiShift[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  const [editingMember, setEditingMember] = useState<Member | null>(null);
+  const [isAddingMember, setIsAddingMember] = useState(false);
+
+  const [formData, setFormData] = useState<MemberForm>({
+    name: "",
+    role: "",
+    hourlyWage: "",
+  });
+  const activeShiftsToday = shifts.filter((shift) =>
+    isToday(new Date(shift.startTime))
+  ).length;
+
+  const loadMembers = async () => {
+    try {
+      setError("");
+      setLoading(true);
+
+      const [employeeData, shiftData] = await Promise.all([
+        api.listEmployees(),
+        api.listShifts(),
+      ]);
+
+      setShifts(shiftData.shifts);
+
+      setMembers(
+        employeeData.employees.map((employee, index) =>
+          employeeToMember(employee, index, shiftData.shifts)
+        )
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "FAILED_TO_LOAD_EMPLOYEES");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadMembers();
+  }, []);
+  
+  const handleOpenAddMember = () => {
+    setEditingMember(null);
+    setIsAddingMember(true);
+    setFormData({
+      name: "",
+      role: "",
+      hourlyWage: "",
+    });
+  };
+
+  const handleOpenEditMember = (member: Member) => {
+    setEditingMember(member);
+    setIsAddingMember(false);
+    setFormData({
+      name: member.name,
+      role: member.role,
+      hourlyWage: String(member.hourlywages),
+    });
+  };
+
+  const handleSaveMember = async () => {
+    const hourlyWage = Number(formData.hourlyWage);
+
+    if (!formData.name || !formData.role || Number.isNaN(hourlyWage)) {
+      setError("Please fill in all employee fields correctly.");
+      return;
+    }
+
+    if (isAddingMember) {
+      await api.createEmployee({
+        name: formData.name,
+        role: formData.role,
+        hourlyWage,
+      });
+    } else if (editingMember) {
+      await api.updateEmployee(editingMember.id, {
+        name: formData.name,
+        role: formData.role,
+        hourlyWage,
+      });
+    }
+
+    setEditingMember(null);
+    setIsAddingMember(false);
+    await loadMembers();
+  };
+
+  const handleDeleteMember = async (id: string) => {
+    if (!confirm("Are you sure you want to remove this member?")) return;
+
+    await api.deleteEmployee(id);
+    setEditingMember(null);
+    await loadMembers();
+  };
 
   return (
     <div className="min-h-screen bg-[#0d0e1b] text-slate-100 p-6 md:p-10">
@@ -44,6 +189,12 @@ const MembersSection: React.FC = () => {
         <button 
           type="button" 
           className="inline-flex bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
+          onChange={handleOpenAddMember}
+          onClick={() => {
+            setIsAddingMember(true);
+            setEditingMember(null);
+            setFormData({ name: "", role: "", hourlyWage: ""});
+          }}
         >
           <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
@@ -59,7 +210,7 @@ const MembersSection: React.FC = () => {
         </div>
         <div className="bg-[#121324] border border-slate-800/60 p-4 rounded-xl">
           <p className="text-xs text-center font-medium text-slate-400 uppercase tracking-wider">Active Shifts Today</p>
-          <p className="text-center text-8xl font-bold text-emerald-400 mt-1 p-12">3</p>
+          <p className="text-center text-8xl font-bold text-emerald-400 mt-1 p-12">{activeShiftsToday}</p>
         </div>
         <div className="bg-[#121324] border border-slate-800/60 p-4 rounded-xl">
           <p className="text-xs text-center font-medium text-slate-400 uppercase tracking-wider">Pending Invites</p>
@@ -100,7 +251,7 @@ const MembersSection: React.FC = () => {
               
               <span className="text-slate-700">|</span>
               <button 
-                    onClick={() => setEditingMember(member)} 
+                    onClick={() => handleOpenEditMember(member)} 
                     className="hover:text-slate-200 transition-colors cursor-pointer"
                     >
                     Edit
@@ -110,35 +261,38 @@ const MembersSection: React.FC = () => {
         ))}
       </div>
 
-        {editingMember && (
+        {(editingMember || isAddingMember) && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
           <div className="bg-[#121324] border border-slate-800 w-full max-w-md p-6 rounded-2xl text-slate-100 shadow-2xl">
             
-            <h2 className="text-xl font-bold text-white mb-4">Edit Profile</h2>
+            <h2 className="text-xl font-bold text-white mb-4">{isAddingMember ? "Add New Employee" : "Edit Profile"} </h2>
             
             
             <div className="space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-400 mb-1">Full Name</label>
-                <input 
-                  type="text" 
-                  defaultValue={editingMember.name} 
+                <input
+                  type="text"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   className="w-full bg-[#0d0e1b] border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none"
                 />
               </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-400 mb-1">Role</label>
-                <input 
-                  type="text" 
-                  defaultValue={editingMember.role} 
+                <input
+                  type="text"
+                  value={formData.role}
+                  onChange={(e) => setFormData({ ...formData, role: e.target.value })}
                   className="w-full bg-[#0d0e1b] border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none"
                 />
               </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-400 mb-1">Hourly Wages</label>
-                <input 
-                  type="text" 
-                  defaultValue={editingMember.hourlywages} 
+                <input
+                  type="number"
+                  value={formData.hourlyWage}
+                  onChange={(e) => setFormData({ ...formData, hourlyWage: e.target.value })}
                   className="w-full bg-[#0d0e1b] border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none"
                 />
               </div>
@@ -148,22 +302,25 @@ const MembersSection: React.FC = () => {
               <button onClick={() => setEditingMember(null)} className="px-4 py-2 text-slate-400 hover:text-white cursor-pointer">
                 Cancel
               </button>
-              <button type="button"
-                    onClick={() => handleDeleteMember(editingMember.id)} //
-                    className="bg-red-500/10 border border-red-500/20 hover:bg-red-500 text-red-500 hover:text-white p-2.5 rounded-xl text-sm font-bold flex items-center justify-center gap-1 transition-all"
-                    >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <polyline points="3 6 5 6 21 6"/>
-                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-                        <line x1="10" y1="11" x2="10" y2="17"/>
-                        <line x1="14" y1="11" x2="14" y2="17"/>
-                    </svg>
-                    <span>Delete</span>
-                    </button>
-              <button onClick={() => {
-                console.log("PUT /api/employees/" + editingMember.id);
-                setEditingMember(null);
-              }} className="bg-blue-600 hover:bg-blue-500 px-5 py-2 rounded-xl text-white font-semibold cursor-pointer">
+              {editingMember && (
+              <button 
+                type="button"
+                onClick={() => handleDeleteMember(editingMember.id)} 
+                className="bg-red-500/10 border border-red-500/20 hover:bg-red-500 text-red-500 hover:text-white p-2.5 rounded-xl text-sm font-bold flex items-center justify-center gap-1 transition-all"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="3 6 5 6 21 6"/>
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                    <line x1="10" y1="11" x2="10" y2="17"/>
+                    <line x1="14" y1="11" x2="14" y2="17"/>
+                </svg>
+                <span>Delete</span>
+              </button>
+            )}
+              <button 
+                onClick={handleSaveMember} 
+                className="bg-blue-600 hover:bg-blue-500 px-5 py-2 rounded-xl text-white font-semibold cursor-pointer"
+              >
                 Save
               </button>
             </div>

@@ -69,7 +69,8 @@ export default function Home() {
         api.listEmployees(),
         api.listShifts(),
       ]);
-
+      console.log("Raw Employee Data:", employeeData);
+      console.log("Raw Shift Data:", shiftData);
       setShifts(shiftData.shifts);
 
       setEmployees(

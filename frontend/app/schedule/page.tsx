@@ -1,39 +1,41 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { api, ApiShift, Employee } from '@/lib/api';
 
-const DAYS_OF_WEEK = [
-  { name: 'Mon', date: '15' },
-  { name: 'Tue', date: '16' },
-  { name: 'Wed', date: '17' },
-  { name: 'Thu', date: '18' },
-  { name: 'Fri', date: '19' },
-  { name: 'Sat', date: '20' },
-  { name: 'Sun', date: '21' },
-];
+// const DAYS_OF_WEEK = [
+//   { name: 'Mon', date: '15' },
+//   { name: 'Tue', date: '16' },
+//   { name: 'Wed', date: '17' },
+//   { name: 'Thu', date: '18' },
+//   { name: 'Fri', date: '19' },
+//   { name: 'Sat', date: '20' },
+//   { name: 'Sun', date: '21' },
+// ];
 
-interface Employee {
-  id: string;
-  name: string;
-  role: string;
-  initials: string;
-  color: string;
-}
+// interface Employee {
+//   id: string;
+//   name: string;
+//   role: string;
+//   initials: string;
+//   color: string;
+// }
 
-const EMPLOYEES: Employee[] = [
-  { id: 'JD', name: 'John Doe', role: 'Senior Barista', initials: 'JD', color: 'from-blue-500 to-cyan-500' },
-  { id: 'JS', name: 'Jane Smith', role: 'Store Manager', initials: 'JS', color: 'from-purple-500 to-pink-500' },
-  { id: 'SW', name: 'Sam Wilson', role: 'Brew Barista', initials: 'SW', color: 'from-emerald-500 to-teal-500' },
-  { id: 'AR', name: 'Alex Rivera', role: 'Shift Support', initials: 'AR', color: 'from-orange-500 to-yellow-500' },
-];
+// const EMPLOYEES: Employee[] = [
+//   { id: 'JD', name: 'John Doe', role: 'Senior Barista', initials: 'JD', color: 'from-blue-500 to-cyan-500' },
+//   { id: 'JS', name: 'Jane Smith', role: 'Store Manager', initials: 'JS', color: 'from-purple-500 to-pink-500' },
+//   { id: 'SW', name: 'Sam Wilson', role: 'Brew Barista', initials: 'SW', color: 'from-emerald-500 to-teal-500' },
+//   { id: 'AR', name: 'Alex Rivera', role: 'Shift Support', initials: 'AR', color: 'from-orange-500 to-yellow-500' },
+// ];
 
 const STATIONS = ['Espresso Bar', 'Brew Bar', 'Register', 'Breakroom', 'Off Duty'];
 
-interface Shift {
-  id: number;
+interface ScheduleShift {
+  id: string;
   employeeId: string;
   station: string;
+  dateKey: string;
   day: string;
   start: string;
   end: string;
@@ -41,13 +43,13 @@ interface Shift {
   totalCols?: number;
 }
 
-const INITIAL_SHIFTS: Shift[] = [
-  { id: 1, employeeId: 'JD', station: 'Espresso Bar', day: 'Mon', start: '08:00', end: '12:30' },
-  { id: 2, employeeId: 'JS', station: 'Register', day: 'Mon', start: '09:00', end: '16:00' },
-  { id: 3, employeeId: 'SW', station: 'Brew Bar', day: 'Mon', start: '13:00', end: '17:30' },
-  { id: 4, employeeId: 'AR', station: 'Register', day: 'Tue', start: '08:00', end: '14:00' },
-  { id: 5, employeeId: 'JD', station: 'Espresso Bar', day: 'Tue', start: '12:00', end: '18:00' },
-];
+// const INITIAL_SHIFTS: Shift[] = [
+//   { id: 1, employeeId: 'JD', station: 'Espresso Bar', day: 'Mon', start: '08:00', end: '12:30' },
+//   { id: 2, employeeId: 'JS', station: 'Register', day: 'Mon', start: '09:00', end: '16:00' },
+//   { id: 3, employeeId: 'SW', station: 'Brew Bar', day: 'Mon', start: '13:00', end: '17:30' },
+//   { id: 4, employeeId: 'AR', station: 'Register', day: 'Tue', start: '08:00', end: '14:00' },
+//   { id: 5, employeeId: 'JD', station: 'Espresso Bar', day: 'Tue', start: '12:00', end: '18:00' },
+// ];
 
 const timeToDecimal = (timeStr: string): number => {
   const [hours, minutes] = timeStr.split(':').map(Number);
@@ -59,25 +61,137 @@ const END_HOUR = 21;
 const TOTAL_HOURS = END_HOUR - START_HOUR;
 const HOURS_ARRAY = Array.from({ length: TOTAL_HOURS + 1 }, (_, i) => START_HOUR + i);
 
+const formatDateKey = (date: Date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const formatTime = (date: Date) =>
+  date.toLocaleTimeString("en-GB", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+
+const getWeekStart = (date: Date) => {
+  const weekStart = new Date(date);
+  weekStart.setHours(0, 0, 0, 0);
+
+  const day = weekStart.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  weekStart.setDate(weekStart.getDate() + diff);
+
+  return weekStart;
+};
+
+const buildWeekDays = (weekStart: Date) =>
+  Array.from({ length: 7 }, (_, index) => {
+    const date = new Date(weekStart);
+    date.setDate(weekStart.getDate() + index);
+
+    return {
+      name: date.toLocaleDateString("en-US", { weekday: "short" }),
+      date: String(date.getDate()),
+      dateKey: formatDateKey(date),
+    };
+  });
+
+const apiShiftToScheduleShift = (shift: ApiShift): ScheduleShift => {
+  const startDate = new Date(shift.startTime);
+  const endDate = new Date(shift.endTime);
+
+  return {
+    id: shift.id,
+    employeeId: shift.employeeId,
+    station: shift.station ?? "Register",
+    dateKey: formatDateKey(startDate),
+    day: startDate.toLocaleDateString("en-US", { weekday: "short" }),
+    start: formatTime(startDate),
+    end: formatTime(endDate),
+  };
+};
+
+const getInitials = (name: string) =>
+  name
+    .split(" ")
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+
+const getEmployeeColor = (index: number) => {
+  const colors = [
+    "from-blue-500 to-cyan-500",
+    "from-purple-500 to-pink-500",
+    "from-emerald-500 to-teal-500",
+    "from-orange-500 to-yellow-500",
+  ];
+
+  return colors[index % colors.length];
+};
+
 export default function SchedulePage() {
-  const [selectedDay, setSelectedDay] = useState<string>('Mon');
-  const [shifts, setShifts] = useState<Shift[]>(INITIAL_SHIFTS);
-  const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
-  const [editingShiftId, setEditingShiftId] = useState<number | null>(null);
-  const [formEmployeeId, setFormEmployeeId] = useState<string>('JD');
-  const [formStation, setFormStation] = useState<string>('Espresso Bar');
-  const [formStart, setFormStart] = useState<string>('08:00');
-  const [formEnd, setFormEnd] = useState<string>('12:00');
+  const [weekStart, setWeekStart] = useState(() => getWeekStart(new Date()));
+  const [selectedDateKey, setSelectedDateKey] = useState(() => formatDateKey(new Date()));
+
+  const daysOfWeek = useMemo(() => buildWeekDays(weekStart), [weekStart]);
+
+  const selectedDay = daysOfWeek.find((day) => day.dateKey === selectedDateKey)?.name ?? "";
+
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [shifts, setShifts] = useState<ScheduleShift[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingShiftId, setEditingShiftId] = useState<string | null>(null);
+  const [formEmployeeId, setFormEmployeeId] = useState("");
+  const [formStation, setFormStation] = useState("Espresso Bar");
+  const [formStart, setFormStart] = useState("08:00");
+  const [formEnd, setFormEnd] = useState("12:00");
+
+  const loadSchedule = async () => {
+    try {
+      setError("");
+      setLoading(true);
+
+      const [employeeData, shiftData] = await Promise.all([
+        api.listEmployees(),
+        api.listShifts(),
+      ]);
+
+      setEmployees(employeeData.employees);
+      setShifts(shiftData.shifts.map(apiShiftToScheduleShift));
+
+      if (!formEmployeeId && employeeData.employees.length > 0) {
+        setFormEmployeeId(employeeData.employees[0].id);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "FAILED_TO_LOAD_SCHEDULE");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadSchedule();
+  }, []);
 
   const activeShifts = useMemo(() => {
-    const dayShifts = shifts.filter(s => s.day === selectedDay);
-    const sorted = [...dayShifts].sort((a, b) => timeToDecimal(a.start) - timeToDecimal(b.start));
-    const columns: Shift[][] = [];
-    
-    sorted.forEach(shift => {
+    const dayShifts = shifts.filter((shift) => shift.dateKey === selectedDateKey);
+
+    const sorted = [...dayShifts].sort(
+      (a, b) => timeToDecimal(a.start) - timeToDecimal(b.start)
+    );
+
+    const columns: ScheduleShift[][] = [];
+
+    sorted.forEach((shift) => {
       let placed = false;
       const startDec = timeToDecimal(shift.start);
-      
+
       for (let c = 0; c < columns.length; c++) {
         const lastShiftInCol = columns[c][columns[c].length - 1];
         const lastEndDec = timeToDecimal(lastShiftInCol.end);
@@ -89,84 +203,97 @@ export default function SchedulePage() {
           break;
         }
       }
-      
+
       if (!placed) {
         columns.push([shift]);
         shift.colIndex = columns.length - 1;
       }
     });
-    sorted.forEach(shift => {
-      shift.totalCols = columns.length;
+
+    sorted.forEach((shift) => {
+      shift.totalCols = columns.length || 1;
     });
 
     return sorted;
-  }, [shifts, selectedDay]);
+  }, [shifts, selectedDateKey]);
 
   const handleOpenAddModal = (hour: number) => {
+    if (employees.length === 0) {
+      alert("Add an employee first.");
+      return;
+    }
+
     setEditingShiftId(null);
-    setFormEmployeeId(EMPLOYEES[0].id);
+    setFormEmployeeId(employees[0].id);
     setFormStation(STATIONS[0]);
-    const startStr = `${hour.toString().padStart(2, '0')}:00`;
-    const endStr = `${(hour + 4).toString().padStart(2, '0')}:00`; // Default 4 hours
-    setFormStart(startStr);
-    setFormEnd(endStr);
+    setFormStart(`${hour.toString().padStart(2, "0")}:00`);
+    setFormEnd(`${(hour + 4).toString().padStart(2, "0")}:00`);
     setIsModalOpen(true);
   };
 
-  const handleOpenEditModal = (e: React.MouseEvent, shift: Shift) => {
-    e.stopPropagation(); 
-    setEditingShiftId(shift.id);
-    setFormEmployeeId(shift.employeeId);
-    setFormStation(shift.station);
-    setFormStart(shift.start);
-    setFormEnd(shift.end);
-    setIsModalOpen(true);
-  };
+  const handleOpenEditModal = (e: React.MouseEvent, shift: ScheduleShift) => {
+      e.stopPropagation(); // Prevents clicking the background timeline by accident
+      setEditingShiftId(shift.id);
+      setFormEmployeeId(shift.employeeId);
+      setFormStation(shift.station);
+      setFormStart(shift.start);
+      setFormEnd(shift.end);
+      setIsModalOpen(true);
+    };
 
-  const handleSaveShift = (e: React.FormEvent) => {
+  const handleSaveShift = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!formEmployeeId) return;
+
     if (timeToDecimal(formStart) >= timeToDecimal(formEnd)) {
       alert("Start time must be before end time!");
       return;
     }
 
+    const startTime = new Date(`${selectedDateKey}T${formStart}:00`).toISOString();
+    const endTime = new Date(`${selectedDateKey}T${formEnd}:00`).toISOString();
+
     if (editingShiftId !== null) {
-      setShifts(prev => prev.map(s => s.id === editingShiftId ? {
-        ...s,
+      await api.updateShift(editingShiftId, {
         employeeId: formEmployeeId,
+        newStartTime: startTime,
+        newEndTime: endTime,
         station: formStation,
-        start: formStart,
-        end: formEnd
-      } : s));
+      });
     } else {
-      const newShift: Shift = {
-        id: Date.now(),
+      await api.createShift({
         employeeId: formEmployeeId,
+        startTime,
+        endTime,
         station: formStation,
-        day: selectedDay,
-        start: formStart,
-        end: formEnd
-      };
-      setShifts(prev => [...prev, newShift]);
+      });
     }
+
     setIsModalOpen(false);
+    await loadSchedule();
   };
 
-  const handleDeleteShift = () => {
+  const handleDeleteShift = async () => {
     if (editingShiftId !== null) {
-      setShifts(prev => prev.filter(s => s.id !== editingShiftId));
+      await api.deleteShift(editingShiftId);
       setIsModalOpen(false);
+      await loadSchedule();
     }
   };
 
   const employeeHours = useMemo(() => {
     const stats: Record<string, number> = {};
-    shifts.filter(s => s.day === selectedDay).forEach(s => {
-      const duration = timeToDecimal(s.end) - timeToDecimal(s.start);
-      stats[s.employeeId] = (stats[s.employeeId] || 0) + duration;
-    });
+
+    shifts
+      .filter((shift) => shift.dateKey === selectedDateKey)
+      .forEach((shift) => {
+        const duration = timeToDecimal(shift.end) - timeToDecimal(shift.start);
+        stats[shift.employeeId] = (stats[shift.employeeId] || 0) + duration;
+      });
+
     return stats;
-  }, [shifts, selectedDay]);
+  }, [shifts, selectedDateKey]);
 
   return (
     <div className="h-screen w-screen bg-[#0b0e14] text-white p-6 font-sans flex flex-col overflow-hidden">
@@ -193,19 +320,22 @@ export default function SchedulePage() {
           </div>
 
           <div className="grid grid-cols-7 gap-2 max-w-xl mx-auto w-full">
-            {DAYS_OF_WEEK.map((day) => {
-              const isActive = selectedDay === day.name;
+            {daysOfWeek.map((day) => {
+              const isActive = selectedDateKey === day.dateKey;
+
               return (
                 <button
-                  key={day.name}
-                  onClick={() => setSelectedDay(day.name)}
+                  key={day.dateKey}
+                  onClick={() => setSelectedDateKey(day.dateKey)}
                   className={`flex flex-col items-center p-2 rounded-xl transition-all ${
-                    isActive 
-                      ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/30' 
-                      : 'hover:bg-white/5 text-gray-400 hover:text-white'
+                    isActive
+                      ? "bg-blue-500 text-white shadow-lg shadow-blue-500/30"
+                      : "hover:bg-white/5 text-gray-400 hover:text-white"
                   }`}
                 >
-                  <span className="text-[10px] uppercase font-bold tracking-wider font-mono">{day.name}</span>
+                  <span className="text-[10px] uppercase font-bold tracking-wider font-mono">
+                    {day.name}
+                  </span>
                   <span className="text-lg font-black mt-0.5">{day.date}</span>
                 </button>
               );
@@ -223,16 +353,17 @@ export default function SchedulePage() {
               </h3>
               
               <div className="space-y-3 overflow-y-auto max-h-[420px] pr-1">
-                {EMPLOYEES.map((emp) => {
+                {employees.map((emp, index) => {
                   const hoursScheduled = employeeHours[emp.id] || 0;
+
                   return (
-                    <div 
+                    <div
                       key={emp.id}
                       className="p-3 rounded-2xl bg-[#1e2130]/40 border border-white/5 flex items-center justify-between"
                     >
                       <div className="flex items-center gap-3">
-                        <div className={`w-8 h-8 rounded-lg bg-gradient-to-tr ${emp.color} flex items-center justify-center font-bold text-xs text-white`}>
-                          {emp.initials}
+                        <div className={`w-8 h-8 rounded-lg bg-gradient-to-tr ${getEmployeeColor(index)} flex items-center justify-center font-bold text-xs text-white`}>
+                          {getInitials(emp.name)}
                         </div>
                         <div>
                           <h4 className="font-bold text-xs">{emp.name}</h4>
@@ -240,8 +371,10 @@ export default function SchedulePage() {
                         </div>
                       </div>
                       <div className="text-right">
-                        <span className="text-xs font-mono font-bold text-blue-400">{hoursScheduled.toFixed(1)} hrs</span>
-                        <p className="text-[9px] text-gray-600">Today</p>
+                        <span className="text-xs font-mono font-bold text-blue-400">
+                          {hoursScheduled.toFixed(1)} hrs
+                        </span>
+                        <p className="text-[9px] text-gray-600">Selected day</p>
                       </div>
                     </div>
                   );
@@ -252,7 +385,7 @@ export default function SchedulePage() {
 
           <section className="flex-1 bg-[#12141d] p-6 rounded-3xl border border-white/5 flex flex-col overflow-hidden">
             <h3 className="text-sm font-bold text-gray-400 font-mono tracking-wider mb-4 shrink-0 flex items-center gap-2">
-              <svg ns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              {/* <svg ns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> */}
               <span>TIMELINE VIEW &bull; {selectedDay}day</span>
             </h3>
             <div className="flex-grow overflow-y-auto relative pr-1 min-h-0">
@@ -290,7 +423,7 @@ export default function SchedulePage() {
                   })}
                   <AnimatePresence>
                     {activeShifts.map((shift) => {
-                      const emp = EMPLOYEES.find(e => e.id === shift.employeeId) || EMPLOYEES[0];
+                      const emp = employees.find((employee) => employee.id === shift.employeeId);
                       const startDec = timeToDecimal(shift.start);
                       const endDec = timeToDecimal(shift.end);
                       
@@ -343,7 +476,7 @@ export default function SchedulePage() {
                                 {shift.station}
                               </span>
                             </div>
-                            <h4 className="font-bold text-xs text-white mt-1 truncate">{emp.name}</h4>
+                            <h4 className="font-bold text-xs text-white mt-1 truncate">{emp?.name ?? "Unknown Employee"}</h4>
                           </div>
 
                           <div className="flex justify-between items-center text-[10px] text-gray-400 font-mono mt-1 shrink-0">
@@ -400,8 +533,10 @@ export default function SchedulePage() {
                     onChange={(e) => setFormEmployeeId(e.target.value)}
                     className="w-full bg-[#12141d] border border-white/10 rounded-xl p-2.5 text-sm outline-none focus:border-blue-500 cursor-pointer"
                   >
-                    {EMPLOYEES.map(emp => (
-                      <option key={emp.id} value={emp.id}>{emp.name} ({emp.role})</option>
+                    {employees.map((emp) => (
+                      <option key={emp.id} value={emp.id}>
+                        {emp.name} ({emp.role})
+                      </option>
                     ))}
                   </select>
                 </div>
