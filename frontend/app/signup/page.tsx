@@ -62,16 +62,14 @@ export default function page() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4 py-12 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8 bg-white p-8 rounded-2xl shadow-md border border-slate-100">
+    <div className="min-h-screen flex items-center justify-center bg-[#0a0d36] px-4 py-12 sm:px-6 lg:px-8">
+      <div className="max-w-md w-full space-y-8  bg-[#05081C] p-8 rounded shadow-md ">
         
         <div className="text-center">
-          <h2 className="mt-2 text-3xl font-extrabold text-slate-900 tracking-tight">
+          <h2 className="mt-2 text-2xl font-extrabold tracking-tight ">
             Create your account
           </h2>
-          <p className="mt-2 text-sm text-slate-600">
-            Set up your business to start optimizing employee shifts.
-          </p>
+        
         </div>
 
         {error && (
@@ -91,7 +89,7 @@ export default function page() {
             
             {/* Business Name Input */}
             <div>
-              <label htmlFor="businessName" className="block text-sm font-medium text-slate-700 mb-1">
+              <label htmlFor="businessName" className="block text-sm font-medium text-gray-700 text-slate-700 mb-1">
                 Business Name
               </label>
               <input
@@ -101,7 +99,7 @@ export default function page() {
                 required
                 value={formData.businessName}
                 onChange={handleChange}
-                className="appearance-none relative block w-full px-3 py-2.5 border border-slate-300 placeholder-slate-400 text-slate-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
                 placeholder="e.g. ShiftMaster Cafe"
               />
             </div>
@@ -117,7 +115,7 @@ export default function page() {
                 required
                 value={formData.username}
                 onChange={handleChange}
-                className="appearance-none relative block w-full px-3 py-2.5 border border-slate-300 placeholder-slate-400 text-slate-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
                 placeholder="Choose a unique username"
               />
             </div>
@@ -133,12 +131,12 @@ export default function page() {
                 required
                 value={formData.password}
                 onChange={handleChange}
-                className="appearance-none relative block w-full px-3 py-2.5 border border-slate-300 placeholder-slate-400 text-slate-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
                 placeholder="••••••••"
               />
             </div>
           </div>
-          
+
           <div>
             <button
               type="submit"
