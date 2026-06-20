@@ -2,32 +2,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { api, ApiShift, Employee, OptimisationResult } from '@/lib/api';
-
-// const DAYS_OF_WEEK = [
-//   { name: 'Mon', date: '15' },
-//   { name: 'Tue', date: '16' },
-//   { name: 'Wed', date: '17' },
-//   { name: 'Thu', date: '18' },
-//   { name: 'Fri', date: '19' },
-//   { name: 'Sat', date: '20' },
-//   { name: 'Sun', date: '21' },
-// ];
-
-// interface Employee {
-//   id: string;
-//   name: string;
-//   role: string;
-//   initials: string;
-//   color: string;
-// }
-
-// const EMPLOYEES: Employee[] = [
-//   { id: 'JD', name: 'John Doe', role: 'Senior Barista', initials: 'JD', color: 'from-blue-500 to-cyan-500' },
-//   { id: 'JS', name: 'Jane Smith', role: 'Store Manager', initials: 'JS', color: 'from-purple-500 to-pink-500' },
-//   { id: 'SW', name: 'Sam Wilson', role: 'Brew Barista', initials: 'SW', color: 'from-emerald-500 to-teal-500' },
-//   { id: 'AR', name: 'Alex Rivera', role: 'Shift Support', initials: 'AR', color: 'from-orange-500 to-yellow-500' },
-// ];
+import { api, ApiShift, Employee, OptimisationResult, ProposedShift } from '@/lib/api';
 
 const STATIONS = ['Espresso Bar', 'Brew Bar', 'Register', 'Breakroom', 'Off Duty'];
 
@@ -42,14 +17,6 @@ interface ScheduleShift {
   colIndex?: number;
   totalCols?: number;
 }
-
-// const INITIAL_SHIFTS: Shift[] = [
-//   { id: 1, employeeId: 'JD', station: 'Espresso Bar', day: 'Mon', start: '08:00', end: '12:30' },
-//   { id: 2, employeeId: 'JS', station: 'Register', day: 'Mon', start: '09:00', end: '16:00' },
-//   { id: 3, employeeId: 'SW', station: 'Brew Bar', day: 'Mon', start: '13:00', end: '17:30' },
-//   { id: 4, employeeId: 'AR', station: 'Register', day: 'Tue', start: '08:00', end: '14:00' },
-//   { id: 5, employeeId: 'JD', station: 'Espresso Bar', day: 'Tue', start: '12:00', end: '18:00' },
-// ];
 
 const timeToDecimal = (timeStr: string): number => {
   const [hours, minutes] = timeStr.split(':').map(Number);
@@ -78,11 +45,9 @@ const formatTime = (date: Date) =>
 const getWeekStart = (date: Date) => {
   const weekStart = new Date(date);
   weekStart.setHours(0, 0, 0, 0);
-
   const day = weekStart.getDay();
   const diff = day === 0 ? -6 : 1 - day;
   weekStart.setDate(weekStart.getDate() + diff);
-
   return weekStart;
 };
 
@@ -90,7 +55,6 @@ const buildWeekDays = (weekStart: Date) =>
   Array.from({ length: 7 }, (_, index) => {
     const date = new Date(weekStart);
     date.setDate(weekStart.getDate() + index);
-
     return {
       name: date.toLocaleDateString("en-US", { weekday: "short" }),
       date: String(date.getDate()),
@@ -101,7 +65,6 @@ const buildWeekDays = (weekStart: Date) =>
 const apiShiftToScheduleShift = (shift: ApiShift): ScheduleShift => {
   const startDate = new Date(shift.startTime);
   const endDate = new Date(shift.endTime);
-
   return {
     id: shift.id,
     employeeId: shift.employeeId,
@@ -114,12 +77,7 @@ const apiShiftToScheduleShift = (shift: ApiShift): ScheduleShift => {
 };
 
 const getInitials = (name: string) =>
-  name
-    .split(" ")
-    .map((part) => part[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
+  name.split(" ").map((part) => part[0]).join("").slice(0, 2).toUpperCase();
 
 const getEmployeeColor = (index: number) => {
   const colors = [
@@ -128,7 +86,6 @@ const getEmployeeColor = (index: number) => {
     "from-emerald-500 to-teal-500",
     "from-orange-500 to-yellow-500",
   ];
-
   return colors[index % colors.length];
 };
 
@@ -137,7 +94,6 @@ export default function SchedulePage() {
   const [selectedDateKey, setSelectedDateKey] = useState(() => formatDateKey(new Date()));
 
   const daysOfWeek = useMemo(() => buildWeekDays(weekStart), [weekStart]);
-
   const selectedDay = daysOfWeek.find((day) => day.dateKey === selectedDateKey)?.name ?? "";
 
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -145,15 +101,17 @@ export default function SchedulePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  // Shift modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingShiftId, setEditingShiftId] = useState<string | null>(null);
   const [formEmployeeId, setFormEmployeeId] = useState("");
   const [formStation, setFormStation] = useState("Espresso Bar");
   const [formStart, setFormStart] = useState("08:00");
   const [formEnd, setFormEnd] = useState("12:00");
+
+  // Optimisation state
   const [isOptimiseOpen, setIsOptimiseOpen] = useState(false);
   const [optimiseStation, setOptimiseStation] = useState("Register");
-  const [optimiseRole, setOptimiseRole] = useState("");
   const [optimiseStart, setOptimiseStart] = useState("09:00");
   const [optimiseEnd, setOptimiseEnd] = useState("17:00");
   const [optimiseStaffCount, setOptimiseStaffCount] = useState("1");
@@ -161,19 +119,19 @@ export default function SchedulePage() {
   const [optimisationLoading, setOptimisationLoading] = useState(false);
   const [optimisationError, setOptimisationError] = useState("");
 
+  // Inline edit state for proposed shifts
+  const [editingProposedIndex, setEditingProposedIndex] = useState<number | null>(null);
+
   const loadSchedule = async () => {
     try {
       setError("");
       setLoading(true);
-
       const [employeeData, shiftData] = await Promise.all([
         api.listEmployees(),
         api.listShifts(),
       ]);
-
       setEmployees(employeeData.employees);
       setShifts(shiftData.shifts.map(apiShiftToScheduleShift));
-
       if (!formEmployeeId && employeeData.employees.length > 0) {
         setFormEmployeeId(employeeData.employees[0].id);
       }
@@ -190,48 +148,33 @@ export default function SchedulePage() {
 
   const activeShifts = useMemo(() => {
     const dayShifts = shifts.filter((shift) => shift.dateKey === selectedDateKey);
-
-    const sorted = [...dayShifts].sort(
-      (a, b) => timeToDecimal(a.start) - timeToDecimal(b.start)
-    );
-
+    const sorted = [...dayShifts].sort((a, b) => timeToDecimal(a.start) - timeToDecimal(b.start));
     const columns: ScheduleShift[][] = [];
 
     sorted.forEach((shift) => {
       let placed = false;
       const startDec = timeToDecimal(shift.start);
-
       for (let c = 0; c < columns.length; c++) {
         const lastShiftInCol = columns[c][columns[c].length - 1];
-        const lastEndDec = timeToDecimal(lastShiftInCol.end);
-
-        if (startDec >= lastEndDec) {
+        if (startDec >= timeToDecimal(lastShiftInCol.end)) {
           columns[c].push(shift);
           shift.colIndex = c;
           placed = true;
           break;
         }
       }
-
       if (!placed) {
         columns.push([shift]);
         shift.colIndex = columns.length - 1;
       }
     });
 
-    sorted.forEach((shift) => {
-      shift.totalCols = columns.length || 1;
-    });
-
+    sorted.forEach((shift) => { shift.totalCols = columns.length || 1; });
     return sorted;
   }, [shifts, selectedDateKey]);
 
   const handleOpenAddModal = (hour: number) => {
-    if (employees.length === 0) {
-      alert("Add an employee first.");
-      return;
-    }
-
+    if (employees.length === 0) { alert("Add an employee first."); return; }
     setEditingShiftId(null);
     setFormEmployeeId(employees[0].id);
     setFormStation(STATIONS[0]);
@@ -241,25 +184,22 @@ export default function SchedulePage() {
   };
 
   const handleOpenEditModal = (e: React.MouseEvent, shift: ScheduleShift) => {
-      e.stopPropagation(); // Prevents clicking the background timeline by accident
-      setEditingShiftId(shift.id);
-      setFormEmployeeId(shift.employeeId);
-      setFormStation(shift.station);
-      setFormStart(shift.start);
-      setFormEnd(shift.end);
-      setIsModalOpen(true);
-    };
+    e.stopPropagation();
+    setEditingShiftId(shift.id);
+    setFormEmployeeId(shift.employeeId);
+    setFormStation(shift.station);
+    setFormStart(shift.start);
+    setFormEnd(shift.end);
+    setIsModalOpen(true);
+  };
 
   const handleSaveShift = async (e: React.FormEvent) => {
     e.preventDefault();
-
     if (!formEmployeeId) return;
-
     if (timeToDecimal(formStart) >= timeToDecimal(formEnd)) {
       alert("Start time must be before end time!");
       return;
     }
-
     const startTime = new Date(`${selectedDateKey}T${formStart}:00`).toISOString();
     const endTime = new Date(`${selectedDateKey}T${formEnd}:00`).toISOString();
 
@@ -271,14 +211,8 @@ export default function SchedulePage() {
         station: formStation,
       });
     } else {
-      await api.createShift({
-        employeeId: formEmployeeId,
-        startTime,
-        endTime,
-        station: formStation,
-      });
+      await api.createShift({ employeeId: formEmployeeId, startTime, endTime, station: formStation });
     }
-
     setIsModalOpen(false);
     await loadSchedule();
   };
@@ -293,7 +227,6 @@ export default function SchedulePage() {
 
   const handlePreviewOptimisation = async (e: React.FormEvent) => {
     e.preventDefault();
-
     const startHour = Math.floor(timeToDecimal(optimiseStart));
     const endHour = Math.floor(timeToDecimal(optimiseEnd));
     const requiredStaff = Number(optimiseStaffCount);
@@ -312,21 +245,10 @@ export default function SchedulePage() {
       setOptimisationError("");
       setOptimisationLoading(true);
       const result = await api.previewOptimisation({
-        weekDemand: [
-          {
-            date: selectedDateKey,
-            requirements: [
-              {
-                station: optimiseStation,
-                ...(optimiseRole && { role: optimiseRole }),
-                hourlyNeeds,
-              },
-            ],
-          },
-        ],
+        weekDemand: [{ date: selectedDateKey, requirements: [{ station: optimiseStation, hourlyNeeds }] }],
       });
-
       setOptimisationResult(result);
+      setEditingProposedIndex(null);
     } catch (err) {
       setOptimisationError(err instanceof Error ? err.message : "OPTIMISATION_FAILED");
     } finally {
@@ -334,9 +256,21 @@ export default function SchedulePage() {
     }
   };
 
+  const handleRemoveProposedShift = (index: number) => {
+    if (!optimisationResult?.proposedShifts) return;
+    const updated = optimisationResult.proposedShifts.filter((_, i) => i !== index);
+    setOptimisationResult({ ...optimisationResult, proposedShifts: updated, shiftsGenerated: updated.length });
+    if (editingProposedIndex === index) setEditingProposedIndex(null);
+  };
+
+  const handleUpdateProposedShift = (index: number, patch: Partial<ProposedShift>) => {
+    if (!optimisationResult?.proposedShifts) return;
+    const updated = optimisationResult.proposedShifts.map((s, i) => i === index ? { ...s, ...patch } : s);
+    setOptimisationResult({ ...optimisationResult, proposedShifts: updated });
+  };
+
   const handleApproveOptimisation = async () => {
     if (!optimisationResult?.proposedShifts?.length) return;
-
     try {
       setOptimisationError("");
       setOptimisationLoading(true);
@@ -349,7 +283,6 @@ export default function SchedulePage() {
           totalHoursOptimized: optimisationResult.totalHoursOptimized,
         },
       });
-
       setIsOptimiseOpen(false);
       setOptimisationResult(null);
       await loadSchedule();
@@ -362,14 +295,12 @@ export default function SchedulePage() {
 
   const employeeHours = useMemo(() => {
     const stats: Record<string, number> = {};
-
     shifts
       .filter((shift) => shift.dateKey === selectedDateKey)
       .forEach((shift) => {
         const duration = timeToDecimal(shift.end) - timeToDecimal(shift.start);
         stats[shift.employeeId] = (stats[shift.employeeId] || 0) + duration;
       });
-
     return stats;
   }, [shifts, selectedDateKey]);
 
@@ -381,20 +312,16 @@ export default function SchedulePage() {
           <div className="flex justify-between items-center">
             <div className="flex items-center gap-3">
               <a href="/home" className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white transition-all">
-                <svg  width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
               </a>
               <div>
-                <h1 className="text-xl font-bold bg-white bg-clip-text text-transparent ">Shift Management</h1>
+                <h1 className="text-xl font-bold bg-white bg-clip-text text-transparent">Shift Management</h1>
               </div>
             </div>
             
             <div className="flex items-center gap-2">
               <button
-                onClick={() => {
-                  setOptimisationResult(null);
-                  setOptimisationError("");
-                  setIsOptimiseOpen(true);
-                }}
+                onClick={() => { setOptimisationResult(null); setOptimisationError(""); setIsOptimiseOpen(true); }}
                 className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 px-4 py-2 rounded-xl text-sm font-bold shadow-lg shadow-emerald-500/20 active:scale-95 transition-all"
               >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
@@ -404,7 +331,7 @@ export default function SchedulePage() {
                 onClick={() => handleOpenAddModal(9)}
                 className="flex items-center gap-2 bg-gradient-to-r from-blue-500 to-cyan-500 px-4 py-2 rounded-xl text-sm font-bold shadow-lg shadow-blue-500/20 hover:brightness-110 active:scale-95 transition-all"
               >
-                <svg  width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                 <span>Schedule Shift</span>
               </button>
             </div>
@@ -413,7 +340,6 @@ export default function SchedulePage() {
           <div className="grid grid-cols-7 gap-2 max-w-xl mx-auto w-full">
             {daysOfWeek.map((day) => {
               const isActive = selectedDateKey === day.dateKey;
-
               return (
                 <button
                   key={day.dateKey}
@@ -424,9 +350,7 @@ export default function SchedulePage() {
                       : "hover:bg-white/5 text-gray-400 hover:text-white"
                   }`}
                 >
-                  <span className="text-[10px] uppercase font-bold tracking-wider font-mono">
-                    {day.name}
-                  </span>
+                  <span className="text-[10px] uppercase font-bold tracking-wider font-mono">{day.name}</span>
                   <span className="text-lg font-black mt-0.5">{day.date}</span>
                 </button>
               );
@@ -446,7 +370,6 @@ export default function SchedulePage() {
               <div className="space-y-3 overflow-y-auto max-h-[420px] pr-1">
                 {employees.map((emp, index) => {
                   const hoursScheduled = employeeHours[emp.id] || 0;
-
                   return (
                     <div
                       key={emp.id}
@@ -462,9 +385,7 @@ export default function SchedulePage() {
                         </div>
                       </div>
                       <div className="text-right">
-                        <span className="text-xs font-mono font-bold text-blue-400">
-                          {hoursScheduled.toFixed(1)} hrs
-                        </span>
+                        <span className="text-xs font-mono font-bold text-blue-400">{hoursScheduled.toFixed(1)} hrs</span>
                         <p className="text-[9px] text-gray-600">Selected day</p>
                       </div>
                     </div>
@@ -476,7 +397,6 @@ export default function SchedulePage() {
 
           <section className="flex-1 bg-[#12141d] p-6 rounded-3xl border border-white/5 flex flex-col overflow-hidden">
             <h3 className="text-sm font-bold text-gray-400 font-mono tracking-wider mb-4 shrink-0 flex items-center gap-2">
-              {/* <svg ns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> */}
               <span>TIMELINE VIEW &bull; {selectedDay}day</span>
             </h3>
             <div className="flex-grow overflow-y-auto relative pr-1 min-h-0">
@@ -517,10 +437,8 @@ export default function SchedulePage() {
                       const emp = employees.find((employee) => employee.id === shift.employeeId);
                       const startDec = timeToDecimal(shift.start);
                       const endDec = timeToDecimal(shift.end);
-                      
                       const topPct = ((startDec - START_HOUR) / TOTAL_HOURS) * 100;
                       const heightPct = ((endDec - startDec) / TOTAL_HOURS) * 100;
-                      
                       const totalCols = shift.totalCols || 1;
                       const colIndex = shift.colIndex || 0;
                       const colWidth = 100 / totalCols;
@@ -585,6 +503,7 @@ export default function SchedulePage() {
         </div>
       </main>
 
+      {/* ── Optimise Modal ── */}
       <AnimatePresence>
         {isOptimiseOpen && (
           <motion.div
@@ -612,7 +531,7 @@ export default function SchedulePage() {
                 </button>
               </div>
 
-              <form onSubmit={handlePreviewOptimisation} className="grid grid-cols-1 md:grid-cols-5 gap-3">
+              <form onSubmit={handlePreviewOptimisation} className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <div>
                   <label className="text-[10px] font-mono text-gray-400 uppercase font-bold block mb-1">Station</label>
                   <select
@@ -620,27 +539,15 @@ export default function SchedulePage() {
                     onChange={(e) => setOptimiseStation(e.target.value)}
                     className="w-full bg-[#12141d] border border-white/10 rounded-xl p-2.5 text-sm outline-none focus:border-emerald-500"
                   >
-                    {STATIONS.filter((station) => station !== "Off Duty").map((station) => (
-                      <option key={station} value={station}>{station}</option>
+                    {STATIONS.filter((s) => s !== "Off Duty").map((s) => (
+                      <option key={s} value={s}>{s}</option>
                     ))}
                   </select>
                 </div>
                 <div>
-                  <label className="text-[10px] font-mono text-gray-400 uppercase font-bold block mb-1">Role</label>
-                  <input
-                    value={optimiseRole}
-                    onChange={(e) => setOptimiseRole(e.target.value)}
-                    placeholder="Any"
-                    className="w-full bg-[#12141d] border border-white/10 rounded-xl p-2.5 text-sm outline-none focus:border-emerald-500"
-                  />
-                </div>
-                <div>
                   <label className="text-[10px] font-mono text-gray-400 uppercase font-bold block mb-1">Start</label>
                   <input
-                    type="time"
-                    value={optimiseStart}
-                    min="07:00"
-                    max="21:00"
+                    type="time" value={optimiseStart} min="07:00" max="21:00"
                     onChange={(e) => setOptimiseStart(e.target.value)}
                     className="w-full bg-[#12141d] border border-white/10 rounded-xl p-2.5 text-sm outline-none focus:border-emerald-500 font-mono"
                   />
@@ -648,20 +555,15 @@ export default function SchedulePage() {
                 <div>
                   <label className="text-[10px] font-mono text-gray-400 uppercase font-bold block mb-1">End</label>
                   <input
-                    type="time"
-                    value={optimiseEnd}
-                    min="07:00"
-                    max="21:00"
+                    type="time" value={optimiseEnd} min="07:00" max="21:00"
                     onChange={(e) => setOptimiseEnd(e.target.value)}
                     className="w-full bg-[#12141d] border border-white/10 rounded-xl p-2.5 text-sm outline-none focus:border-emerald-500 font-mono"
                   />
                 </div>
                 <div>
-                  <label className="text-[10px] font-mono text-gray-400 uppercase font-bold block mb-1">Staff</label>
+                  <label className="text-[10px] font-mono text-gray-400 uppercase font-bold block mb-1">Staff Needed</label>
                   <input
-                    type="number"
-                    value={optimiseStaffCount}
-                    min="1"
+                    type="number" value={optimiseStaffCount} min="1"
                     onChange={(e) => setOptimiseStaffCount(e.target.value)}
                     className="w-full bg-[#12141d] border border-white/10 rounded-xl p-2.5 text-sm outline-none focus:border-emerald-500 font-mono"
                   />
@@ -670,7 +572,7 @@ export default function SchedulePage() {
                 <button
                   type="submit"
                   disabled={optimisationLoading}
-                  className="md:col-span-5 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-60 text-white p-2.5 rounded-xl text-sm font-bold transition-all"
+                  className="md:col-span-4 col-span-2 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-60 text-white p-2.5 rounded-xl text-sm font-bold transition-all"
                 >
                   {optimisationLoading ? "Optimising..." : "Preview Suggested Schedule"}
                 </button>
@@ -687,7 +589,7 @@ export default function SchedulePage() {
                   <div className="grid grid-cols-3 gap-3">
                     <div className="rounded-xl bg-[#12141d] border border-white/10 p-3">
                       <p className="text-[10px] text-gray-500 font-mono uppercase">Generated</p>
-                      <p className="text-lg font-bold">{optimisationResult.shiftsGenerated}</p>
+                      <p className="text-lg font-bold">{optimisationResult.proposedShifts?.length ?? 0}</p>
                     </div>
                     <div className="rounded-xl bg-[#12141d] border border-white/10 p-3">
                       <p className="text-[10px] text-gray-500 font-mono uppercase">Cost</p>
@@ -723,30 +625,91 @@ export default function SchedulePage() {
                   {optimisationResult.coverage &&
                     optimisationResult.coverage.requestedStaffHours > 0 &&
                     optimisationResult.coverage.existingCoveredStaffHours >= optimisationResult.coverage.requestedStaffHours &&
-                    optimisationResult.shiftsGenerated === 0 && (
+                    (optimisationResult.proposedShifts?.length ?? 0) === 0 && (
                       <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-3 text-xs text-emerald-200">
                         This demand is already covered by existing shifts, so no new shift is needed.
                       </div>
                     )}
 
-                  {optimisationResult.shiftsGenerated === 0 &&
+                  {(optimisationResult.proposedShifts?.length ?? 0) === 0 &&
                     (optimisationResult.coverage?.unfilledStaffHours ?? 0) > 0 && (
                       <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 p-3 text-xs text-amber-200">
-                        No eligible employee matched the current station, role, availability, and hour limits for the missing demand.
+                        No eligible employee matched the current station, availability, and hour limits for the missing demand.
                       </div>
                     )}
 
+                  {/* Proposed shifts — with edit & remove per row */}
                   <div className="max-h-56 overflow-y-auto space-y-2 pr-1">
                     {optimisationResult.proposedShifts?.map((shift, index) => (
-                      <div key={`${shift.employeeId}-${shift.startTime}-${index}`} className="rounded-xl bg-[#12141d] border border-white/10 p-3 flex justify-between gap-3">
-                        <div>
-                          <p className="text-sm font-bold">{shift.employeeName}</p>
-                          <p className="text-xs text-gray-400">{shift.role} &bull; {shift.station}</p>
+                      <div key={`${shift.employeeId}-${shift.startTime}-${index}`} className="rounded-xl bg-[#12141d] border border-white/10 overflow-hidden">
+                        <div className="p-3 flex justify-between gap-3 items-start">
+                          <div className="min-w-0">
+                            <p className="text-sm font-bold truncate">{shift.employeeName}</p>
+                            <p className="text-xs text-gray-400">{shift.role} &bull; {shift.station}</p>
+                          </div>
+                          <div className="text-right text-xs font-mono text-gray-300 shrink-0">
+                            <p>{formatTime(new Date(shift.startTime))} - {formatTime(new Date(shift.endTime))}</p>
+                            <p className="text-gray-500">{shift.breakMinutes} min break</p>
+                          </div>
+                          <div className="flex gap-1 shrink-0">
+                            <button
+                              onClick={() => setEditingProposedIndex(editingProposedIndex === index ? null : index)}
+                              className="p-1.5 rounded-lg bg-blue-500/10 border border-blue-500/20 hover:bg-blue-500/20 text-blue-400 transition-all"
+                              title="Edit shift"
+                            >
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
+                            </button>
+                            <button
+                              onClick={() => handleRemoveProposedShift(index)}
+                              className="p-1.5 rounded-lg bg-red-500/10 border border-red-500/20 hover:bg-red-500/20 text-red-400 transition-all"
+                              title="Remove shift"
+                            >
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                            </button>
+                          </div>
                         </div>
-                        <div className="text-right text-xs font-mono text-gray-300">
-                          <p>{formatTime(new Date(shift.startTime))} - {formatTime(new Date(shift.endTime))}</p>
-                          <p className="text-gray-500">{shift.breakMinutes} min break</p>
-                        </div>
+
+                        {/* Inline edit panel */}
+                        <AnimatePresence>
+                          {editingProposedIndex === index && (
+                            <motion.div
+                              initial={{ height: 0, opacity: 0 }}
+                              animate={{ height: "auto", opacity: 1 }}
+                              exit={{ height: 0, opacity: 0 }}
+                              className="overflow-hidden border-t border-white/5"
+                            >
+                              <div className="p-3 grid grid-cols-2 gap-2">
+                                <div>
+                                  <label className="text-[9px] font-mono text-gray-500 uppercase block mb-1">Employee</label>
+                                  <select
+                                    value={shift.employeeId}
+                                    onChange={(e) => {
+                                      const emp = employees.find(em => em.id === e.target.value);
+                                      if (emp) handleUpdateProposedShift(index, { employeeId: emp.id, employeeName: emp.name, role: emp.role });
+                                    }}
+                                    className="w-full bg-[#0b0e14] border border-white/10 rounded-lg p-1.5 text-xs outline-none focus:border-blue-500"
+                                  >
+                                    {employees.map((emp) => (
+                                      <option key={emp.id} value={emp.id}>{emp.name}</option>
+                                    ))}
+                                  </select>
+                                </div>
+                                <div>
+                                  <label className="text-[9px] font-mono text-gray-500 uppercase block mb-1">Station</label>
+                                  <select
+                                    value={shift.station}
+                                    onChange={(e) => handleUpdateProposedShift(index, { station: e.target.value })}
+                                    className="w-full bg-[#0b0e14] border border-white/10 rounded-lg p-1.5 text-xs outline-none focus:border-blue-500"
+                                  >
+                                    {STATIONS.filter(s => s !== "Off Duty").map((s) => (
+                                      <option key={s} value={s}>{s}</option>
+                                    ))}
+                                  </select>
+                                </div>
+                              </div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
                       </div>
                     ))}
                   </div>
@@ -789,6 +752,7 @@ export default function SchedulePage() {
         )}
       </AnimatePresence>
 
+      {/* ── Add / Edit Shift Modal ── */}
       <AnimatePresence>
         {isModalOpen && (
           <motion.div
@@ -816,7 +780,7 @@ export default function SchedulePage() {
                   onClick={() => setIsModalOpen(false)}
                   className="p-1 rounded-lg hover:bg-white/5 text-gray-400 hover:text-white"
                 >
-                  <svg  width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                 </button>
               </div>
 
@@ -829,9 +793,7 @@ export default function SchedulePage() {
                     className="w-full bg-[#12141d] border border-white/10 rounded-xl p-2.5 text-sm outline-none focus:border-blue-500 cursor-pointer"
                   >
                     {employees.map((emp) => (
-                      <option key={emp.id} value={emp.id}>
-                        {emp.name} ({emp.role})
-                      </option>
+                      <option key={emp.id} value={emp.id}>{emp.name} ({emp.role})</option>
                     ))}
                   </select>
                 </div>
@@ -853,10 +815,7 @@ export default function SchedulePage() {
                   <div>
                     <label className="text-[10px] font-mono text-gray-400 uppercase font-bold block mb-1">Start Time</label>
                     <input
-                      type="time"
-                      value={formStart}
-                      min="07:00"
-                      max="21:00"
+                      type="time" value={formStart} min="07:00" max="21:00"
                       onChange={(e) => setFormStart(e.target.value)}
                       className="w-full bg-[#12141d] border border-white/10 rounded-xl p-2.5 text-sm outline-none focus:border-blue-500 font-mono"
                       required
@@ -865,10 +824,7 @@ export default function SchedulePage() {
                   <div>
                     <label className="text-[10px] font-mono text-gray-400 uppercase font-bold block mb-1">End Time</label>
                     <input
-                      type="time"
-                      value={formEnd}
-                      min="07:00"
-                      max="21:00"
+                      type="time" value={formEnd} min="07:00" max="21:00"
                       onChange={(e) => setFormEnd(e.target.value)}
                       className="w-full bg-[#12141d] border border-white/10 rounded-xl p-2.5 text-sm outline-none focus:border-blue-500 font-mono"
                       required
@@ -883,7 +839,7 @@ export default function SchedulePage() {
                       onClick={handleDeleteShift}
                       className="flex-1 bg-red-500/10 border border-red-500/20 hover:bg-red-500 text-red-500 hover:text-white p-2.5 rounded-xl text-sm font-bold flex items-center justify-center gap-1 transition-all"
                     >
-                      <svg  width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
                       <span>Delete</span>
                     </button>
                   )}

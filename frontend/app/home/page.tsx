@@ -5,6 +5,7 @@ import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from "next/navigation";
 import { api, ApiShift } from "@/lib/api";
+import { getAuthToken } from "@/lib/auth";
 import Link from 'next/link';
 
 
@@ -29,14 +30,18 @@ interface CalendarDay {
 }
 
 export default function Home() {
-  // const [chartData, setChartData] = useState([
-  //   { name: "Jan", optimised: 0, unoptimised: 0 },
-  // ]);
-
+  const router = useRouter();
   const [employees, setEmployees] = useState<DashboardEmployee[]>([]);
   const [shifts, setShifts] = useState<ApiShift[]>([]);
   const [selectedDate, setSelectedDate] = useState<CalendarDay | null>(null);
   const [dashboardError, setDashboardError] = useState("");
+
+  useEffect(() => {
+    if (!getAuthToken()) {
+      router.replace('/');
+    }
+  }, [router]);
+
   const chartData = useMemo(() => {
     const grouped = shifts.reduce<
       Record<string, { name: string; optimised: number; unoptimised: number }>
@@ -64,6 +69,7 @@ export default function Home() {
 
     return Object.values(grouped);
   }, [shifts]);
+
   useEffect(() => {
     async function loadDashboardData() {
       try {
@@ -101,14 +107,15 @@ export default function Home() {
 
     loadDashboardData();
   }, []);
+
   const getInitials = (name: string) => {
-  return name
-    .split(" ")
-    .map((part) => part[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
-};
+    return name
+      .split(" ")
+      .map((part) => part[0])
+      .join("")
+      .slice(0, 2)
+      .toUpperCase();
+  };
 
   const getShiftDuration = (shift: ApiShift) => {
     const start = new Date(shift.startTime).getTime();
@@ -125,14 +132,6 @@ export default function Home() {
       date.getMonth() === today.getMonth() &&
       date.getDate() === today.getDate()
     );
-  };
-
-  const getDayStatus = (dayShifts: ApiShift[]) => {
-    if (dayShifts.length === 0) return null;
-
-    const hasUnoptimised = dayShifts.some((shift) => !shift.isOptimised);
-
-    return hasUnoptimised ? "unoptimised" : "optimised";
   };
 
   const calendarData = useMemo(() => {
@@ -178,26 +177,19 @@ export default function Home() {
     });
   }, [shifts, employees]);
 
-  // const handleToggleStatus = (index: number) => {
-  //   setEmployees(prev => prev.map((emp, idx) => {
-  //     if (idx === index) {
-  //       const nextStatus = emp.status === 'Active' ? 'Break' : emp.status === 'Break' ? 'Offline' : 'Active';
-  //       const nextStation = nextStatus === 'Active' ? 'Espresso Bar' : nextStatus === 'Break' ? 'Breakroom' : 'Off Duty';
-  //       return { ...emp, status: nextStatus, station: nextStation };
-  //     }
-  //     return emp;
-  //   }));
-  // };
-
   return (
     <div className="h-screen w-screen bg-[#0b0e14] text-white p-6 font-sans flex flex-col overflow-hidden">
       <main className="max-w-[1440px] w-full h-full mx-auto flex flex-col gap-8 overflow-hidden min-h-0">
         
         <header className="flex justify-between items-center bg-[#1e2130]/50 backdrop-blur-md p-4 rounded-2xl border border-white/10 shrink-0">
-          <h1 className="text-xl font-bold bg-white bg-clip-text text-transparent ">Dashboard </h1>
+          <h1 className="text-xl font-bold bg-white bg-clip-text text-transparent">Dashboard</h1>
           <div className="flex items-center gap-4">
-            <div className="w-9 h-9 rounded-full bg-green-500"></div>
-            <span className="font-mono text-sm">ADMIN</span>
+            <Link href="/profile" className="flex items-center gap-3 group">
+              <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-blue-500 to-cyan-500 flex items-center justify-center text-xs font-bold text-white group-hover:ring-2 group-hover:ring-blue-400 transition-all">
+                AD
+              </div>
+              <span className="font-mono text-sm text-gray-400 group-hover:text-white transition-colors">ADMIN</span>
+            </Link>
           </div>
         </header>
 
@@ -213,7 +205,7 @@ export default function Home() {
             className="md:col-span-1 bg-gradient-to-b from-[#1e2130] to-[#12141d] p-6 rounded-3xl border border-white/10 shadow-2xl flex flex-col justify-between"
           >
             <div>
-              <h1 className="text-3xl font-black italic">HI ADMIN</h1>
+              <h1 className="text-3xl font-black">Welcome to Admin Dashboard</h1>
               <p className="text-blue-400 mt-1 font-mono text-xs">SYSTEM_STATUS: OPTIMAL</p>
             </div>
             <div>
@@ -245,7 +237,6 @@ export default function Home() {
                   <div key={item.day} className="relative group w-full h-full min-h-[32px] max-h-[46px]">
                     <motion.button
                       whileHover={{ scale: 1.05 }}
-                      // onClick={() => setSelectedDate(item)}
                       className={`rounded-xl flex items-center justify-center font-bold text-xs transition-all w-full h-full ${
                         item.status === 'optimised' ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.3)]' : 
                         item.status === 'unoptimised' ? 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.3)]' : 
@@ -311,7 +302,9 @@ export default function Home() {
           <section className="md:col-span-1 bg-[#1e2130] p-6 rounded-3xl border border-white/5 shadow-[0_0_20px_rgba(0,0,0,0.5)] flex flex-col overflow-hidden">
             <h3 className="text-sm font-bold text-green-400 font-mono tracking-widest flex items-center gap-2 shrink-0">
               <span className="w-2 h-2 rounded-full bg-green-500"></span>
-              ROSTER
+              <Link href="/member" className="hover:text-green-300 hover:underline transition-all">
+                ROSTER
+              </Link>
             </h3>
             
             <div className="flex-1 min-h-0 overflow-y-auto space-y-2 mt-3 pr-1">

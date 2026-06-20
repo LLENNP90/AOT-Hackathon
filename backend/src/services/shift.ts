@@ -56,6 +56,20 @@ export class ShiftHandler {
         return shift
     }
 
+    static async getShiftByIdForUser(input: {
+        userId: string,
+        shiftId: string,
+    }) {
+        const shift = await prisma.shift.findFirst({
+            where: {
+                id: input.shiftId,
+                employee: { userId: input.userId }
+            }
+        })
+        if (!shift) throw ErrorResponses.EMPLOYEE_NOT_FOUND
+        return shift
+    }
+
     static async updateShift(input: {
         id: string,
         employeeId: string
@@ -64,17 +78,16 @@ export class ShiftHandler {
         station?: string
         breakMinutes?: number
     }){
-        const shift = await prisma.shift.findFirst({
-            where: {
-                id: input.id,
-                employeeId: input.employeeId,
-            }
+        // Look up by shiftId only — employeeId may be changing (user is reassigning the shift)
+        const shift = await prisma.shift.findUnique({
+            where: { id: input.id }
         })
-        if (!shift) throw ErrorResponses.MISSING_FIELDS //CHANGE LATER
+        if (!shift) throw ErrorResponses.EMPLOYEE_NOT_FOUND
 
         return await prisma.shift.update({
             where: {id: shift.id},
             data: {
+                employeeId: input.employeeId,
                 startTime: input.newStartTime,
                 endTime: input.newEndTime,
                 ...(input.station !== undefined && { station: input.station }),
@@ -90,7 +103,7 @@ export class ShiftHandler {
             })
 
             if (!shift) {
-                return ErrorResponses.EMPLOYEE_NOT_FOUND
+                throw ErrorResponses.EMPLOYEE_NOT_FOUND
             }
 
             return await prisma.shift.delete({

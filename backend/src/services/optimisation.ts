@@ -71,9 +71,11 @@ const MALAYSIA_OFFSET = "+08:00";
 const normalize = (value?: string | null) => value?.trim().toLowerCase() ?? "";
 
 const dateAtHour = (date: string, hour: number) => {
+  // Use pure UTC arithmetic so the result is correct regardless of server timezone.
+  // new Date(`${date}T00:00:00+08:00`) gives us midnight MYT as a UTC timestamp,
+  // then we add `hour` hours in ms to get the correct MYT hour in UTC.
   const base = new Date(`${date}T00:00:00${MALAYSIA_OFFSET}`);
-  base.setHours(hour, 0, 0, 0);
-  return base;
+  return new Date(base.getTime() + hour * 60 * 60 * 1000);
 };
 
 const formatDateKey = (date: Date) => {

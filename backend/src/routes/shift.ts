@@ -24,12 +24,13 @@ router.get(
     authMiddleware,
     async (req, res, next) => {
         try {
-            const employeeId = (req as any).employee.id;
+            if (!req.user) return next(ErrorResponses.UNAUTHORISED)
+            const userId = req.user.id;
             const shiftId = req.params.id as string
             
-            const shift = await ShiftHandler.getShiftById({
-                employeeId: employeeId,
-                shiftId: shiftId
+            const shift = await ShiftHandler.getShiftByIdForUser({
+                userId,
+                shiftId,
             })
             return Success(res, shift)
         } catch (err) {
@@ -45,12 +46,11 @@ router.put(
         try{
             const shiftId = req.params.id as string
             const {newStartTime, newEndTime, employeeId, station, breakMinutes} = req.body
-            // const employeeId = (req as any).employeeId
             if (!newStartTime || !newEndTime || !employeeId){
-                return ErrorResponses.MISSING_FIELDS
+                return next(ErrorResponses.MISSING_FIELDS)
             }
             const updatedShift = await ShiftHandler.updateShift({
-                id: shiftId, 
+                id: shiftId,
                 employeeId,
                 newStartTime: new Date(newStartTime),
                 newEndTime: new Date(newEndTime),
@@ -68,18 +68,26 @@ router.post(
     "/create",
     authMiddleware,
     async (req, res, next) => {
-        if (!req.user) throw ErrorResponses.UNAUTHORISED
+        try {
+            if (!req.user) return next(ErrorResponses.UNAUTHORISED)
 
-        const {employeeId, startTime, endTime, station, breakMinutes} = req.body
+            const {employeeId, startTime, endTime, station, breakMinutes} = req.body
 
-        const shift = await ShiftHandler.newShift({
-            employeeId,
-            startTime: new Date(startTime),
-            endTime: new Date(endTime),
-            station,
-            breakMinutes,
-        });
-        Success(res, { shift })
+            if (!employeeId || !startTime || !endTime) {
+                return next(ErrorResponses.MISSING_FIELDS)
+            }
+
+            const shift = await ShiftHandler.newShift({
+                employeeId,
+                startTime: new Date(startTime),
+                endTime: new Date(endTime),
+                station,
+                breakMinutes,
+            });
+            return Success(res, { shift })
+        } catch (err) {
+            next(err)
+        }
     }
 )
 
