@@ -16,6 +16,21 @@ export type Employee = {
   name: string;
   role: string;
   hourlyWage: number;
+  maxDailyHours?: number;
+  maxWeeklyHours?: number;
+  minShiftHours?: number;
+  stationSkills?: string[];
+  availability?: EmployeeAvailability[];
+};
+
+export type EmployeeAvailability = {
+  id: string;
+  employeeId: string;
+  dayOfWeek?: number | null;
+  date?: string | null;
+  startTime: string;
+  endTime: string;
+  isAvailable: boolean;
 };
 
 export type ApiShift = {
@@ -25,6 +40,7 @@ export type ApiShift = {
   endTime: string;
   isOptimised?: boolean;
   station?: string;
+  breakMinutes?: number;
 };
 
 export type DayName = "Mon" | "Tue" | "Wed" | "Thu" | "Fri" | "Sat" | "Sun";
@@ -42,7 +58,50 @@ export type TimetableShift = {
 
 export type WeekDemand = {
   date: string;
+  hourlyNeeds?: Record<string, number>;
+  requirements?: DemandRequirement[];
+};
+
+export type DemandRequirement = {
+  station?: string;
+  role?: string;
   hourlyNeeds: Record<string, number>;
+};
+
+export type ProposedShift = {
+  employeeId: string;
+  employeeName: string;
+  role: string;
+  station: string;
+  startTime: string;
+  endTime: string;
+  breakMinutes: number;
+  isOptimised: true;
+};
+
+export type OptimisationResult = {
+  success: boolean;
+  code: string;
+  proposedShifts?: ProposedShift[];
+  shiftsGenerated: number;
+  estimatedOldCost: number;
+  totalCost: number;
+  moneySaved: number;
+  totalHoursOptimized?: number;
+  coverage?: {
+    requestedStaffHours: number;
+    existingCoveredStaffHours: number;
+    newlyGeneratedStaffHours: number;
+    unfilledStaffHours: number;
+  };
+  unfilledSlots?: {
+    date: string;
+    hour: number;
+    station: string;
+    role?: string;
+    missing: number;
+  }[];
+  warnings?: string[];
 };
 
 async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
@@ -156,6 +215,10 @@ export const api = {
     name: string;
     role: string;
     hourlyWage: number;
+    maxDailyHours?: number;
+    maxWeeklyHours?: number;
+    minShiftHours?: number;
+    stationSkills?: string[];
   }) {
     return apiFetch<{ success: boolean; code: string; employee: Employee }>("api/employee", {
       method: "POST",
@@ -169,6 +232,10 @@ export const api = {
       name?: string;
       role?: string;
       hourlyWage?: number;
+      maxDailyHours?: number;
+      maxWeeklyHours?: number;
+      minShiftHours?: number;
+      stationSkills?: string[];
     }
   ) {
     return apiFetch<{ success: boolean; code: string; employee: Employee }>(`api/employee/${id}`, {
@@ -181,6 +248,43 @@ export const api = {
     return apiFetch<{ success: boolean; code: string; id: string }>(`api/employee/${id}`, {
       method: "DELETE",
     });
+  },
+
+  listAvailability(employeeId: string) {
+    return apiFetch<{
+      success: boolean;
+      code: string;
+      availability: EmployeeAvailability[];
+    }>(`api/employee/${employeeId}/availability`);
+  },
+
+  createAvailability(
+    employeeId: string,
+    input: {
+      dayOfWeek?: number;
+      date?: string;
+      startTime: string;
+      endTime: string;
+      isAvailable?: boolean;
+    }
+  ) {
+    return apiFetch<{
+      success: boolean;
+      code: string;
+      availability: EmployeeAvailability;
+    }>(`api/employee/${employeeId}/availability`, {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
+  },
+
+  deleteAvailability(availabilityId: string) {
+    return apiFetch<{ success: boolean; code: string; id: string }>(
+      `api/employee/availability/${availabilityId}`,
+      {
+        method: "DELETE",
+      }
+    );
   },
 
   listShifts() {
@@ -196,6 +300,7 @@ export const api = {
     startTime: string;
     endTime: string;
     station?: string;
+    breakMinutes?: number;
   }) {
     return apiFetch<{ success: boolean; code: string; shift: ApiShift }>("api/shift/create", {
       method: "POST",
@@ -210,6 +315,7 @@ export const api = {
       newStartTime: string;
       newEndTime: string;
       station?: string;
+      breakMinutes?: number;
     }
   ) {
     return apiFetch<{ success: boolean; code: string; shift: ApiShift }>(`api/shift/${id}`, {
@@ -242,15 +348,44 @@ export const api = {
     }>("api/activityLog/recent");
   },
 
-  optimise(input: { weekDemand: WeekDemand[] }) {
-    return apiFetch<{
-      success: boolean;
-      code: string;
-      shiftsGenerated: number;
-      estimatedOldCost: number;
-      totalCost: number;
-      moneySaved: number;
-    }>("api/optimisation/optimise", {
+  optimise(input: {
+    weekDemand: WeekDemand[];
+    options?: {
+      breakAfterHours?: number;
+      breakDurationMinutes?: number;
+      fairnessWeight?: number;
+    };
+  }) {
+    return apiFetch<OptimisationResult>("api/optimisation/optimise", {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
+  },
+
+  previewOptimisation(input: {
+    weekDemand: WeekDemand[];
+    options?: {
+      breakAfterHours?: number;
+      breakDurationMinutes?: number;
+      fairnessWeight?: number;
+    };
+  }) {
+    return apiFetch<OptimisationResult>("api/optimisation/preview", {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
+  },
+
+  approveOptimisation(input: {
+    proposedShifts: ProposedShift[];
+    metrics?: {
+      estimatedOldCost?: number;
+      totalCost?: number;
+      moneySaved?: number;
+      totalHoursOptimized?: number;
+    };
+  }) {
+    return apiFetch<OptimisationResult>("api/optimisation/approve", {
       method: "POST",
       body: JSON.stringify(input),
     });

@@ -44,7 +44,7 @@ router.put(
     async (req, res, next) => {
         try{
             const shiftId = req.params.id as string
-            const {newStartTime, newEndTime, employeeId} = req.body
+            const {newStartTime, newEndTime, employeeId, station, breakMinutes} = req.body
             // const employeeId = (req as any).employeeId
             if (!newStartTime || !newEndTime || !employeeId){
                 return ErrorResponses.MISSING_FIELDS
@@ -53,7 +53,9 @@ router.put(
                 id: shiftId, 
                 employeeId,
                 newStartTime: new Date(newStartTime),
-                newEndTime: new Date(newEndTime)
+                newEndTime: new Date(newEndTime),
+                station,
+                breakMinutes,
             })
             return Success(res, updatedShift)
         } catch (err) {
@@ -68,12 +70,14 @@ router.post(
     async (req, res, next) => {
         if (!req.user) throw ErrorResponses.UNAUTHORISED
 
-        const {employeeId, startTime, endTime} = req.body
+        const {employeeId, startTime, endTime, station, breakMinutes} = req.body
 
         const shift = await ShiftHandler.newShift({
             employeeId,
             startTime: new Date(startTime),
             endTime: new Date(endTime),
+            station,
+            breakMinutes,
         });
         Success(res, { shift })
     }

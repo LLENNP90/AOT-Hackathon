@@ -17,7 +17,15 @@ router.post(
     try {
       if (!req.user) throw ErrorResponses.UNAUTHORISED;
 
-      const { name, role, hourlyWage } = req.body;
+      const {
+        name,
+        role,
+        hourlyWage,
+        maxDailyHours,
+        maxWeeklyHours,
+        minShiftHours,
+        stationSkills,
+      } = req.body;
 
       if (!name || !role || hourlyWage == null) {
         throw ErrorResponses.MISSING_FIELDS;
@@ -27,6 +35,10 @@ router.post(
         name,
         role,
         hourlyWage,
+        maxDailyHours,
+        maxWeeklyHours,
+        minShiftHours,
+        stationSkills,
       });
 
       Success(res, { employee });
@@ -81,9 +93,25 @@ router.patch<EmployeeIdParams>(
       if (!req.user) throw ErrorResponses.UNAUTHORISED;
 
       const { id } = req.params;
-      const { name, role, hourlyWage } = req.body;
+      const {
+        name,
+        role,
+        hourlyWage,
+        maxDailyHours,
+        maxWeeklyHours,
+        minShiftHours,
+        stationSkills,
+      } = req.body;
 
-      if (!name && !role && hourlyWage == null) {
+      if (
+        !name &&
+        !role &&
+        hourlyWage == null &&
+        maxDailyHours == null &&
+        maxWeeklyHours == null &&
+        minShiftHours == null &&
+        stationSkills == null
+      ) {
         throw ErrorResponses.MISSING_FIELDS;
       }
 
@@ -91,6 +119,10 @@ router.patch<EmployeeIdParams>(
         name,
         role,
         hourlyWage,
+        maxDailyHours,
+        maxWeeklyHours,
+        minShiftHours,
+        stationSkills,
       });
 
       Success(res, { employee: updatedEmployee });
@@ -111,6 +143,70 @@ router.delete<EmployeeIdParams>(
       const { id } = req.params;
 
       const result = await EmployeeService.delete(req.user.id, id);
+
+      Success(res, result);
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+router.get<EmployeeIdParams>(
+  "/:id/availability",
+  authMiddleware,
+  async (req, res, next) => {
+    try {
+      if (!req.user) throw ErrorResponses.UNAUTHORISED;
+
+      const availability = await EmployeeService.listAvailability(req.user.id, req.params.id);
+
+      Success(res, { availability });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+router.post<EmployeeIdParams>(
+  "/:id/availability",
+  authMiddleware,
+  async (req, res, next) => {
+    try {
+      if (!req.user) throw ErrorResponses.UNAUTHORISED;
+
+      const { dayOfWeek, date, startTime, endTime, isAvailable } = req.body;
+
+      if (!startTime || !endTime) throw ErrorResponses.MISSING_FIELDS;
+
+      const availability = await EmployeeService.addAvailability(req.user.id, req.params.id, {
+        dayOfWeek,
+        date,
+        startTime,
+        endTime,
+        isAvailable,
+      });
+
+      Success(res, { availability });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+router.delete(
+  "/availability/:availabilityId",
+  authMiddleware,
+  async (req, res, next) => {
+    try {
+      if (!req.user) throw ErrorResponses.UNAUTHORISED;
+
+      const { availabilityId } = req.params;
+      if (!availabilityId || Array.isArray(availabilityId)) throw ErrorResponses.MISSING_FIELDS;
+
+      const result = await EmployeeService.deleteAvailability(
+        req.user.id,
+        availabilityId
+      );
 
       Success(res, result);
     } catch (err) {

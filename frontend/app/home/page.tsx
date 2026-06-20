@@ -36,6 +36,7 @@ export default function Home() {
   const [employees, setEmployees] = useState<DashboardEmployee[]>([]);
   const [shifts, setShifts] = useState<ApiShift[]>([]);
   const [selectedDate, setSelectedDate] = useState<CalendarDay | null>(null);
+  const [dashboardError, setDashboardError] = useState("");
   const chartData = useMemo(() => {
     const grouped = shifts.reduce<
       Record<string, { name: string; optimised: number; unoptimised: number }>
@@ -65,33 +66,37 @@ export default function Home() {
   }, [shifts]);
   useEffect(() => {
     async function loadDashboardData() {
-      const [employeeData, shiftData] = await Promise.all([
-        api.listEmployees(),
-        api.listShifts(),
-      ]);
-      console.log("Raw Employee Data:", employeeData);
-      console.log("Raw Shift Data:", shiftData);
-      setShifts(shiftData.shifts);
+      try {
+        setDashboardError("");
+        const [employeeData, shiftData] = await Promise.all([
+          api.listEmployees(),
+          api.listShifts(),
+        ]);
 
-      setEmployees(
-        employeeData.employees.map((employee) => {
-          const todayShift = shiftData.shifts.find((shift) => {
-            return (
-              shift.employeeId === employee.id &&
-              isToday(new Date(shift.startTime))
-            );
-          });
+        setShifts(shiftData.shifts);
 
-          return {
-            id: employee.id,
-            name: employee.name,
-            role: employee.role,
-            initials: getInitials(employee.name),
-            status: todayShift ? "Active" : "Off Duty",
-            station: todayShift?.station ?? "No Shift",
-          };
-        })
-      );
+        setEmployees(
+          employeeData.employees.map((employee) => {
+            const todayShift = shiftData.shifts.find((shift) => {
+              return (
+                shift.employeeId === employee.id &&
+                isToday(new Date(shift.startTime))
+              );
+            });
+
+            return {
+              id: employee.id,
+              name: employee.name,
+              role: employee.role,
+              initials: getInitials(employee.name),
+              status: todayShift ? "Active" : "Off Duty",
+              station: todayShift?.station ?? "No Shift",
+            };
+          })
+        );
+      } catch (err) {
+        setDashboardError(err instanceof Error ? err.message : "FAILED_TO_LOAD_DASHBOARD");
+      }
     }
 
     loadDashboardData();
@@ -195,6 +200,12 @@ export default function Home() {
             <span className="font-mono text-sm">ADMIN</span>
           </div>
         </header>
+
+        {dashboardError && (
+          <div className="bg-red-500/10 border border-red-500/20 text-red-200 px-4 py-3 rounded-xl text-sm">
+            Dashboard failed to load: {dashboardError}
+          </div>
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5 flex-[4] min-h-0">
           <motion.section 

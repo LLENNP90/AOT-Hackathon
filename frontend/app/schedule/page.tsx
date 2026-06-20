@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { api, ApiShift, Employee } from '@/lib/api';
+import { api, ApiShift, Employee, OptimisationResult } from '@/lib/api';
 
 // const DAYS_OF_WEEK = [
 //   { name: 'Mon', date: '15' },
@@ -151,6 +151,15 @@ export default function SchedulePage() {
   const [formStation, setFormStation] = useState("Espresso Bar");
   const [formStart, setFormStart] = useState("08:00");
   const [formEnd, setFormEnd] = useState("12:00");
+  const [isOptimiseOpen, setIsOptimiseOpen] = useState(false);
+  const [optimiseStation, setOptimiseStation] = useState("Register");
+  const [optimiseRole, setOptimiseRole] = useState("");
+  const [optimiseStart, setOptimiseStart] = useState("09:00");
+  const [optimiseEnd, setOptimiseEnd] = useState("17:00");
+  const [optimiseStaffCount, setOptimiseStaffCount] = useState("1");
+  const [optimisationResult, setOptimisationResult] = useState<OptimisationResult | null>(null);
+  const [optimisationLoading, setOptimisationLoading] = useState(false);
+  const [optimisationError, setOptimisationError] = useState("");
 
   const loadSchedule = async () => {
     try {
@@ -282,6 +291,75 @@ export default function SchedulePage() {
     }
   };
 
+  const handlePreviewOptimisation = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    const startHour = Math.floor(timeToDecimal(optimiseStart));
+    const endHour = Math.floor(timeToDecimal(optimiseEnd));
+    const requiredStaff = Number(optimiseStaffCount);
+
+    if (startHour >= endHour || Number.isNaN(requiredStaff) || requiredStaff < 1) {
+      setOptimisationError("Check the optimisation inputs.");
+      return;
+    }
+
+    const hourlyNeeds: Record<string, number> = {};
+    for (let hour = startHour; hour < endHour; hour++) {
+      hourlyNeeds[hour.toString()] = requiredStaff;
+    }
+
+    try {
+      setOptimisationError("");
+      setOptimisationLoading(true);
+      const result = await api.previewOptimisation({
+        weekDemand: [
+          {
+            date: selectedDateKey,
+            requirements: [
+              {
+                station: optimiseStation,
+                ...(optimiseRole && { role: optimiseRole }),
+                hourlyNeeds,
+              },
+            ],
+          },
+        ],
+      });
+
+      setOptimisationResult(result);
+    } catch (err) {
+      setOptimisationError(err instanceof Error ? err.message : "OPTIMISATION_FAILED");
+    } finally {
+      setOptimisationLoading(false);
+    }
+  };
+
+  const handleApproveOptimisation = async () => {
+    if (!optimisationResult?.proposedShifts?.length) return;
+
+    try {
+      setOptimisationError("");
+      setOptimisationLoading(true);
+      await api.approveOptimisation({
+        proposedShifts: optimisationResult.proposedShifts,
+        metrics: {
+          estimatedOldCost: optimisationResult.estimatedOldCost,
+          totalCost: optimisationResult.totalCost,
+          moneySaved: optimisationResult.moneySaved,
+          totalHoursOptimized: optimisationResult.totalHoursOptimized,
+        },
+      });
+
+      setIsOptimiseOpen(false);
+      setOptimisationResult(null);
+      await loadSchedule();
+    } catch (err) {
+      setOptimisationError(err instanceof Error ? err.message : "APPROVE_OPTIMISATION_FAILED");
+    } finally {
+      setOptimisationLoading(false);
+    }
+  };
+
   const employeeHours = useMemo(() => {
     const stats: Record<string, number> = {};
 
@@ -310,13 +388,26 @@ export default function SchedulePage() {
               </div>
             </div>
             
-            <button
-              onClick={() => handleOpenAddModal(9)}
-              className="flex items-center gap-2 bg-gradient-to-r from-blue-500 to-cyan-500 px-4 py-2 rounded-xl text-sm font-bold shadow-lg shadow-blue-500/20 hover:brightness-110 active:scale-95 transition-all"
-            >
-              <svg  width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-              <span>Schedule Shift</span>
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => {
+                  setOptimisationResult(null);
+                  setOptimisationError("");
+                  setIsOptimiseOpen(true);
+                }}
+                className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 px-4 py-2 rounded-xl text-sm font-bold shadow-lg shadow-emerald-500/20 active:scale-95 transition-all"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
+                <span>Optimise Day</span>
+              </button>
+              <button
+                onClick={() => handleOpenAddModal(9)}
+                className="flex items-center gap-2 bg-gradient-to-r from-blue-500 to-cyan-500 px-4 py-2 rounded-xl text-sm font-bold shadow-lg shadow-blue-500/20 hover:brightness-110 active:scale-95 transition-all"
+              >
+                <svg  width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                <span>Schedule Shift</span>
+              </button>
+            </div>
           </div>
 
           <div className="grid grid-cols-7 gap-2 max-w-xl mx-auto w-full">
@@ -493,6 +584,210 @@ export default function SchedulePage() {
           </section>
         </div>
       </main>
+
+      <AnimatePresence>
+        {isOptimiseOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+          >
+            <motion.div
+              initial={{ scale: 0.95, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95, y: 20 }}
+              className="bg-[#1e2130] border border-white/10 p-6 rounded-3xl w-full max-w-2xl shadow-[0_0_50px_rgba(0,0,0,0.6)]"
+            >
+              <div className="flex justify-between items-center mb-5">
+                <div>
+                  <h3 className="text-lg font-bold">Optimise {selectedDay} Schedule</h3>
+                  <p className="text-xs text-gray-400 font-mono">{selectedDateKey}</p>
+                </div>
+                <button
+                  onClick={() => setIsOptimiseOpen(false)}
+                  className="p-1 rounded-lg hover:bg-white/5 text-gray-400 hover:text-white"
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+              </div>
+
+              <form onSubmit={handlePreviewOptimisation} className="grid grid-cols-1 md:grid-cols-5 gap-3">
+                <div>
+                  <label className="text-[10px] font-mono text-gray-400 uppercase font-bold block mb-1">Station</label>
+                  <select
+                    value={optimiseStation}
+                    onChange={(e) => setOptimiseStation(e.target.value)}
+                    className="w-full bg-[#12141d] border border-white/10 rounded-xl p-2.5 text-sm outline-none focus:border-emerald-500"
+                  >
+                    {STATIONS.filter((station) => station !== "Off Duty").map((station) => (
+                      <option key={station} value={station}>{station}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[10px] font-mono text-gray-400 uppercase font-bold block mb-1">Role</label>
+                  <input
+                    value={optimiseRole}
+                    onChange={(e) => setOptimiseRole(e.target.value)}
+                    placeholder="Any"
+                    className="w-full bg-[#12141d] border border-white/10 rounded-xl p-2.5 text-sm outline-none focus:border-emerald-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-mono text-gray-400 uppercase font-bold block mb-1">Start</label>
+                  <input
+                    type="time"
+                    value={optimiseStart}
+                    min="07:00"
+                    max="21:00"
+                    onChange={(e) => setOptimiseStart(e.target.value)}
+                    className="w-full bg-[#12141d] border border-white/10 rounded-xl p-2.5 text-sm outline-none focus:border-emerald-500 font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-mono text-gray-400 uppercase font-bold block mb-1">End</label>
+                  <input
+                    type="time"
+                    value={optimiseEnd}
+                    min="07:00"
+                    max="21:00"
+                    onChange={(e) => setOptimiseEnd(e.target.value)}
+                    className="w-full bg-[#12141d] border border-white/10 rounded-xl p-2.5 text-sm outline-none focus:border-emerald-500 font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-mono text-gray-400 uppercase font-bold block mb-1">Staff</label>
+                  <input
+                    type="number"
+                    value={optimiseStaffCount}
+                    min="1"
+                    onChange={(e) => setOptimiseStaffCount(e.target.value)}
+                    className="w-full bg-[#12141d] border border-white/10 rounded-xl p-2.5 text-sm outline-none focus:border-emerald-500 font-mono"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={optimisationLoading}
+                  className="md:col-span-5 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-60 text-white p-2.5 rounded-xl text-sm font-bold transition-all"
+                >
+                  {optimisationLoading ? "Optimising..." : "Preview Suggested Schedule"}
+                </button>
+              </form>
+
+              {optimisationError && (
+                <div className="mt-4 rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-300">
+                  {optimisationError}
+                </div>
+              )}
+
+              {optimisationResult && (
+                <div className="mt-5 space-y-4">
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="rounded-xl bg-[#12141d] border border-white/10 p-3">
+                      <p className="text-[10px] text-gray-500 font-mono uppercase">Generated</p>
+                      <p className="text-lg font-bold">{optimisationResult.shiftsGenerated}</p>
+                    </div>
+                    <div className="rounded-xl bg-[#12141d] border border-white/10 p-3">
+                      <p className="text-[10px] text-gray-500 font-mono uppercase">Cost</p>
+                      <p className="text-lg font-bold">RM {optimisationResult.totalCost.toFixed(2)}</p>
+                    </div>
+                    <div className="rounded-xl bg-[#12141d] border border-white/10 p-3">
+                      <p className="text-[10px] text-gray-500 font-mono uppercase">Saved</p>
+                      <p className="text-lg font-bold text-emerald-400">RM {optimisationResult.moneySaved.toFixed(2)}</p>
+                    </div>
+                  </div>
+
+                  {optimisationResult.coverage && (
+                    <div className="grid grid-cols-4 gap-2 text-center">
+                      <div className="rounded-xl bg-[#12141d]/70 border border-white/10 p-2">
+                        <p className="text-[9px] text-gray-500 font-mono uppercase">Demand</p>
+                        <p className="text-sm font-bold">{optimisationResult.coverage.requestedStaffHours}h</p>
+                      </div>
+                      <div className="rounded-xl bg-[#12141d]/70 border border-white/10 p-2">
+                        <p className="text-[9px] text-gray-500 font-mono uppercase">Existing</p>
+                        <p className="text-sm font-bold">{optimisationResult.coverage.existingCoveredStaffHours}h</p>
+                      </div>
+                      <div className="rounded-xl bg-[#12141d]/70 border border-white/10 p-2">
+                        <p className="text-[9px] text-gray-500 font-mono uppercase">New</p>
+                        <p className="text-sm font-bold">{optimisationResult.coverage.newlyGeneratedStaffHours}h</p>
+                      </div>
+                      <div className="rounded-xl bg-[#12141d]/70 border border-white/10 p-2">
+                        <p className="text-[9px] text-gray-500 font-mono uppercase">Unfilled</p>
+                        <p className="text-sm font-bold">{optimisationResult.coverage.unfilledStaffHours}h</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {optimisationResult.coverage &&
+                    optimisationResult.coverage.requestedStaffHours > 0 &&
+                    optimisationResult.coverage.existingCoveredStaffHours >= optimisationResult.coverage.requestedStaffHours &&
+                    optimisationResult.shiftsGenerated === 0 && (
+                      <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-3 text-xs text-emerald-200">
+                        This demand is already covered by existing shifts, so no new shift is needed.
+                      </div>
+                    )}
+
+                  {optimisationResult.shiftsGenerated === 0 &&
+                    (optimisationResult.coverage?.unfilledStaffHours ?? 0) > 0 && (
+                      <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 p-3 text-xs text-amber-200">
+                        No eligible employee matched the current station, role, availability, and hour limits for the missing demand.
+                      </div>
+                    )}
+
+                  <div className="max-h-56 overflow-y-auto space-y-2 pr-1">
+                    {optimisationResult.proposedShifts?.map((shift, index) => (
+                      <div key={`${shift.employeeId}-${shift.startTime}-${index}`} className="rounded-xl bg-[#12141d] border border-white/10 p-3 flex justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-bold">{shift.employeeName}</p>
+                          <p className="text-xs text-gray-400">{shift.role} &bull; {shift.station}</p>
+                        </div>
+                        <div className="text-right text-xs font-mono text-gray-300">
+                          <p>{formatTime(new Date(shift.startTime))} - {formatTime(new Date(shift.endTime))}</p>
+                          <p className="text-gray-500">{shift.breakMinutes} min break</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {(optimisationResult.unfilledSlots?.length ?? 0) > 0 && (
+                    <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 p-3 text-xs text-amber-200">
+                      {optimisationResult.unfilledSlots?.length} demand slot(s) could not be filled with the current constraints.
+                    </div>
+                  )}
+
+                  {(optimisationResult.warnings?.length ?? 0) > 0 && (
+                    <div className="rounded-xl border border-white/10 bg-white/5 p-3 text-xs text-gray-300">
+                      {optimisationResult.warnings?.slice(0, 3).map((warning) => (
+                        <p key={warning}>{warning}</p>
+                      ))}
+                    </div>
+                  )}
+
+                  <div className="flex justify-end gap-3 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setOptimisationResult(null)}
+                      className="px-4 py-2 text-sm font-bold text-gray-400 hover:text-white"
+                    >
+                      Revise
+                    </button>
+                    <button
+                      type="button"
+                      disabled={optimisationLoading || !optimisationResult.proposedShifts?.length}
+                      onClick={handleApproveOptimisation}
+                      className="bg-blue-500 hover:bg-blue-600 disabled:opacity-60 text-white px-5 py-2 rounded-xl text-sm font-bold transition-all"
+                    >
+                      Approve Schedule
+                    </button>
+                  </div>
+                </div>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <AnimatePresence>
         {isModalOpen && (

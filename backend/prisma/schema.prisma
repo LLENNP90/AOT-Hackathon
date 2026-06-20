@@ -36,7 +36,12 @@ model Employee {
   name          String
   role          String        //for now
   hourlyWage    Float
+  maxDailyHours Float       @default(8)
+  maxWeeklyHours Float      @default(40)
+  minShiftHours Float       @default(3)
+  stationSkills String[]    @default([])
   shifts        Shift[]
+  availability  EmployeeAvailability[]
 }
 
 model Shift {
@@ -45,7 +50,25 @@ model Shift {
   employee      Employee    @relation(fields: [employeeId], references: [id])
   startTime     DateTime
   endTime       DateTime
+  station       String?
+  breakMinutes  Int         @default(0)
   isOptimised   Boolean     @default(false) // optimised or nah
+
+  @@unique([employeeId, startTime, endTime])
+}
+
+model EmployeeAvailability {
+  id            String      @id @default(uuid()) @db.Uuid
+  employeeId    String      @db.Uuid
+  employee      Employee    @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  dayOfWeek     Int?        // 0 = Sunday, 1 = Monday, etc. Used for weekly repeating availability.
+  date          DateTime?   // Optional date-specific override.
+  startTime     String      // "09:00"
+  endTime       String      // "17:00"
+  isAvailable   Boolean     @default(true)
+
+  @@index([employeeId, dayOfWeek])
+  @@index([employeeId, date])
 }
 
 model ActivityLog {

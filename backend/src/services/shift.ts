@@ -5,6 +5,8 @@ interface newShiftInput {
     employeeId: string
     startTime: Date
     endTime: Date
+    station?: string
+    breakMinutes?: number
 }
 
 export class ShiftHandler {
@@ -16,6 +18,8 @@ export class ShiftHandler {
                 employeeId: input.employeeId,
                 startTime: input.startTime,
                 endTime: input.endTime,
+                ...(input.station !== undefined && { station: input.station }),
+                breakMinutes: input.breakMinutes ?? 0,
                 isOptimised: false
             }
         })
@@ -33,6 +37,8 @@ export class ShiftHandler {
                 employeeId: true,
                 startTime: true,
                 endTime: true,
+                station: true,
+                breakMinutes: true,
                 isOptimised: true
             }
         })
@@ -55,6 +61,8 @@ export class ShiftHandler {
         employeeId: string
         newStartTime: Date
         newEndTime: Date
+        station?: string
+        breakMinutes?: number
     }){
         const shift = await prisma.shift.findFirst({
             where: {
@@ -66,7 +74,12 @@ export class ShiftHandler {
 
         return await prisma.shift.update({
             where: {id: shift.id},
-            data: {startTime: input.newStartTime, endTime: input.newEndTime}
+            data: {
+                startTime: input.newStartTime,
+                endTime: input.newEndTime,
+                ...(input.station !== undefined && { station: input.station }),
+                ...(input.breakMinutes !== undefined && { breakMinutes: input.breakMinutes }),
+            }
         })
     }
 
