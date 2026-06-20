@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/dist/client/link';
 import React, { useState } from 'react';
 
 
@@ -42,7 +43,6 @@ const MembersSection: React.FC = () => {
         </button>
       </div>
 
-      {/* Quick Metrics Bar */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
         <div className="bg-[#121324] border border-slate-800/60 p-4 rounded-xl">
           <p className="text-xs text-center font-medium text-slate-400 uppercase tracking-wider">Total Members</p>
@@ -58,7 +58,7 @@ const MembersSection: React.FC = () => {
         </div>
       </div>
 
-      {/* Members Grid layout */}
+
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
         {members.map((member) => (
           <div 
@@ -80,9 +80,17 @@ const MembersSection: React.FC = () => {
               {member.role}
             </p>
 
-            {/* Actions Quick-menu simulation */}
             <div className="mt-6 pt-4 border-t border-slate-800/80 w-full flex justify-center gap-4 text-xs font-medium text-slate-400">
-              <button className="hover:text-white transition-colors">View Shifts</button>
+            
+            <button className="hover:text-white transition-colors">
+                <Link 
+                    href={`/employeeshift?employeeId=${member.id}`}
+                    className=" hover:text-blue-300 transition-colors font-medium cursor-pointer"
+                >
+                    View Shifts
+                </Link>
+            </button>
+              
               <span className="text-slate-700">|</span>
               <button className="hover:text-rose-400 transition-colors">Edit</button>
             </div>
