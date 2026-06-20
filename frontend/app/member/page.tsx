@@ -10,18 +10,25 @@ interface Member {
   role: string;
   avatarUrl?: string;
   initials: string;
+  hourlywages: number;
   status: 'Active' | 'Inactive';
   colorClass: string;
 }
 
 const MembersSection: React.FC = () => {
-  const [members] = useState<Member[]>([
-    { id: '1', name: 'Jen Sen', role: 'Admin', initials: 'JS', status: 'Active', colorClass: 'bg-rose-500' },
-    { id: '2', name: 'Wei Ming', role: 'Full Access', initials: 'WM', status: 'Active', colorClass: 'bg-teal-500' },
-    { id: '3', name: 'Jun Han', role: 'Full Access', initials: 'JH', status: 'Active', colorClass: 'bg-indigo-500' },
-    { id: '4', name: 'Kit Qi', role: 'Full Access', initials: 'KQ', status: 'Active', colorClass: 'bg-amber-500' },
-    { id: '5', name: 'Wayne Ong', role: 'Full Access', initials: 'WO', status: 'Active', colorClass: 'bg-orange-500' },
+  const [members, setMembers] = useState<Member[]>([
+    { id: '1', name: 'Jen Sen', role: 'Admin', initials: 'JS', hourlywages: 12, status: 'Active', colorClass: 'bg-rose-500' },
+    { id: '2', name: 'Wei Ming', role: 'Full Access', initials: 'WM', hourlywages: 10, status: 'Active', colorClass: 'bg-teal-500' },
+    { id: '3', name: 'Jun Han', role: 'Full Access', initials: 'JH', hourlywages: 10, status: 'Active', colorClass: 'bg-indigo-500' },
+    { id: '4', name: 'Kit Qi', role: 'Full Access', initials: 'KQ', hourlywages: 12, status: 'Active', colorClass: 'bg-amber-500' },
+    { id: '5', name: 'Wayne Ong', role: 'Full Access', initials: 'WO', hourlywages: 15, status: 'Active', colorClass: 'bg-orange-500' },
   ]);
+
+  const handleDeleteMember = (id: string) => {
+  if (confirm("Are you sure you want to remove this member?")) {
+    setMembers(prevMembers => prevMembers.filter(member => member.id !== id));
+  }
+};
 
   const [editingMember, setEditingMember] = useState<any | null>(null);
 
@@ -29,7 +36,7 @@ const MembersSection: React.FC = () => {
     <div className="min-h-screen bg-[#0d0e1b] text-slate-100 p-6 md:p-10">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-800 pb-6 mb-8">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">Team Members</h1>
+    <h1 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">MEET THE TEAM</h1>
           <p className="mt-1 text-sm text-slate-400">
             Manage your organization's employees, access permissions, and roles.
           </p>
@@ -109,7 +116,7 @@ const MembersSection: React.FC = () => {
             
             <h2 className="text-xl font-bold text-white mb-4">Edit Profile</h2>
             
-            {/* Input fields pre-filled with the selected member's database name */}
+            
             <div className="space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-400 mb-1">Full Name</label>
@@ -127,15 +134,34 @@ const MembersSection: React.FC = () => {
                   className="w-full bg-[#0d0e1b] border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none"
                 />
               </div>
-              {/* Add more inputs here as needed later */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 mb-1">Hourly Wages</label>
+                <input 
+                  type="text" 
+                  defaultValue={editingMember.hourlywages} 
+                  className="w-full bg-[#0d0e1b] border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none"
+                />
+              </div>
             </div>
 
             <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-slate-800/60">
               <button onClick={() => setEditingMember(null)} className="px-4 py-2 text-slate-400 hover:text-white cursor-pointer">
                 Cancel
               </button>
+              <button type="button"
+                    onClick={() => handleDeleteMember(editingMember.id)} //
+                    className="bg-red-500/10 border border-red-500/20 hover:bg-red-500 text-red-500 hover:text-white p-2.5 rounded-xl text-sm font-bold flex items-center justify-center gap-1 transition-all"
+                    >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="3 6 5 6 21 6"/>
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                        <line x1="10" y1="11" x2="10" y2="17"/>
+                        <line x1="14" y1="11" x2="14" y2="17"/>
+                    </svg>
+                    <span>Delete</span>
+                    </button>
               <button onClick={() => {
-                console.log("PUT /api/employees/" + editingMember.id); // Tells backend what to update
+                console.log("PUT /api/employees/" + editingMember.id);
                 setEditingMember(null);
               }} className="bg-blue-600 hover:bg-blue-500 px-5 py-2 rounded-xl text-white font-semibold cursor-pointer">
                 Save
