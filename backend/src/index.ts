@@ -5,6 +5,7 @@ import userRouter from "./routes/user.js"
 import employeeRouter from "./routes/employee.js"
 import shiftRouter from "./routes/shift.js"
 import activityLogRouter from "./routes/activityLog.js"
+import optimisationRouter from "./routes/optimisation.js"
 import { errorHandler } from "./err/error.js";
 
 dotenv.config();
@@ -26,7 +27,8 @@ app.listen(PORT, () => {
 
 app.use("/api/user", userRouter)
 
-app.use("/api/employee", employeeRouter)
-app.use("/api/shift", shiftRouter)
-
+app.use("/api/employee", employeeRouter);
+app.use("/api/shift", shiftRouter);
+app.use("api/activityLog", activityLogRouter);
+app.use("/api/optimisation", optimisationRouter)
 app.use(errorHandler)
