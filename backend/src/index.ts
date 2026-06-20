@@ -2,6 +2,7 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import userRouter from "./routes/user.js"
+import employeeRouter from "./routes/employee.js"
 
 dotenv.config();
 
@@ -21,3 +22,5 @@ app.listen(PORT, () => {
 }); 
 
 app.use("/api/user", userRouter)
+
+app.use("/api/employee", employeeRouter)

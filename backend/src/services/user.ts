@@ -22,18 +22,6 @@ interface EditUserInput {
   businessName?: string;
 }
 
-interface AddEmployeeInput {
-  name: string;
-  role: string;
-  hourlyWage: number;
-}
-
-interface EditEmployeeInput {
-  name?: string;
-  role?: string;
-  hourlyWage?: number;
-}
-
 // ------- USER -------
 
 export class UserService{
