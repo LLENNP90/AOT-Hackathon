@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/dist/client/link';
+import Link from 'next/link';
 import React, { useState } from 'react';
 
 
@@ -22,6 +22,8 @@ const MembersSection: React.FC = () => {
     { id: '4', name: 'Kit Qi', role: 'Full Access', initials: 'KQ', status: 'Active', colorClass: 'bg-amber-500' },
     { id: '5', name: 'Wayne Ong', role: 'Full Access', initials: 'WO', status: 'Active', colorClass: 'bg-orange-500' },
   ]);
+
+  const [editingMember, setEditingMember] = useState<any | null>(null);
 
   return (
     <div className="min-h-screen bg-[#0d0e1b] text-slate-100 p-6 md:p-10">
@@ -82,22 +84,67 @@ const MembersSection: React.FC = () => {
 
             <div className="mt-6 pt-4 border-t border-slate-800/80 w-full flex justify-center gap-4 text-xs font-medium text-slate-400">
             
-            <button className="hover:text-white transition-colors">
-                <Link 
-                    href={`/employeeshift?employeeId=${member.id}`}
-                    className=" hover:text-blue-300 transition-colors font-medium cursor-pointer"
+            <Link 
+                href={`/employeeshift?employeeId=${member.id}`}
+                className="text-slate-400 hover:text-white transition-colors font-medium cursor-pointer"
                 >
-                    View Shifts
-                </Link>
-            </button>
+                View Shifts
+            </Link>
               
               <span className="text-slate-700">|</span>
-              <button className="hover:text-rose-400 transition-colors">Edit</button>
+              <button 
+                    onClick={() => setEditingMember(member)} 
+                    className="hover:text-slate-200 transition-colors cursor-pointer"
+                    >
+                    Edit
+                </button>
             </div>
           </div>
         ))}
       </div>
 
+        {editingMember && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
+          <div className="bg-[#121324] border border-slate-800 w-full max-w-md p-6 rounded-2xl text-slate-100 shadow-2xl">
+            
+            <h2 className="text-xl font-bold text-white mb-4">Edit Profile</h2>
+            
+            {/* Input fields pre-filled with the selected member's database name */}
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 mb-1">Full Name</label>
+                <input 
+                  type="text" 
+                  defaultValue={editingMember.name} 
+                  className="w-full bg-[#0d0e1b] border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 mb-1">Role</label>
+                <input 
+                  type="text" 
+                  defaultValue={editingMember.role} 
+                  className="w-full bg-[#0d0e1b] border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none"
+                />
+              </div>
+              {/* Add more inputs here as needed later */}
+            </div>
+
+            <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-slate-800/60">
+              <button onClick={() => setEditingMember(null)} className="px-4 py-2 text-slate-400 hover:text-white cursor-pointer">
+                Cancel
+              </button>
+              <button onClick={() => {
+                console.log("PUT /api/employees/" + editingMember.id); // Tells backend what to update
+                setEditingMember(null);
+              }} className="bg-blue-600 hover:bg-blue-500 px-5 py-2 rounded-xl text-white font-semibold cursor-pointer">
+                Save
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
     </div>
   );
 };
