@@ -7,7 +7,6 @@ export default function login() {
       <div className="bg-[#05081C] p-8 rounded shadow-md w-full max-w-sm">
         <h2 className="text-2xl font-bold flex justify-center items-center">Login</h2>
         <form>
-
           <div className="username mt-3">
             <label className="block text-gray-700 text-sm font-bold">
               Username
