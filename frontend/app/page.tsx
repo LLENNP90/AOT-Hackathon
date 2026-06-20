@@ -30,6 +30,18 @@ export default function Page() {
       >
         Signup
       </Link>
+      <Link 
+        href="/member" 
+        style={{ 
+          padding: '8px 16px', 
+          backgroundColor: '#000', 
+          color: '#fff', 
+          borderRadius: '4px',
+          textDecoration: 'none'
+        }}
+      >
+        member
+      </Link>
     </div>
   );
 }
