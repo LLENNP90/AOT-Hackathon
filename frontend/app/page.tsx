@@ -18,6 +18,18 @@ export default function Page() {
       >
         Login
       </Link>
+      <Link 
+        href="/signup" 
+        style={{ 
+          padding: '8px 16px', 
+          backgroundColor: '#000', 
+          color: '#fff', 
+          borderRadius: '4px',
+          textDecoration: 'none'
+        }}
+      >
+        Signup
+      </Link>
     </div>
   );
 }
